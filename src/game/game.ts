@@ -28,7 +28,7 @@ export class Game {
         document.addEventListener('keydown', (event) => {
             keysPressed[event.key] = true;
 
-            if (event.key === 'ArrowUp') {
+            if (event.key === 'w') {
                 this.player.jump();
             }
 
@@ -41,13 +41,28 @@ export class Game {
         });
 
         document.addEventListener('mousemove', (event) => {
-            this.mouseX = event.clientX;
-            this.mouseY = event.clientY;
-        })
+            // Pobierz pozycję i wymiary canvasu względem viewportu
+            const rect = this.canvas.getBoundingClientRect();
+            
+            // Przelicz pozycję myszy względem canvasu
+            this.mouseX = event.clientX - rect.left;
+            this.mouseY = event.clientY - rect.top;
 
+            // Uwzględnij skalowanie canvasu, jeśli występuje
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            
+            this.mouseX *= scaleX;
+            this.mouseY *= scaleY;
+        });
+
+        // Zaktualizuj również obsługę mousedown
         document.addEventListener('mousedown', (event) => {
-            console.log(`klik X: ${event.pageX} Y: ${event.pageY}`);
-        })
+            const rect = this.canvas.getBoundingClientRect();
+            const clickX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
+            const clickY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
+            console.log(`klik X: ${Math.round(clickX)} Y: ${Math.round(clickY)}`);
+        });
 
         // Obsługuj aktualizacje stanu gry od serwera
 
@@ -101,52 +116,31 @@ export class Game {
         this.ctx.fillRect(0, 600, 1920, 50);
     }
 
-    drawHand() {
-        const handLength = 50;
-        const handWidth = 15;
-    
-        const dx = this.mouseX - this.player.x;
-        const dy = this.mouseY - this.player.y;
-    
-        const angle = Math.atan2(dy, dx);
-        this.angle = angle;
-    
-        this.ctx.save();
-        this.ctx.translate(this.player.x, this.player.y);
-    
-        this.ctx.rotate(angle);
-    
-        this.ctx.fillStyle = 'red';
-        this.ctx.fillRect(-handLength/2, -handWidth/2, handLength, handWidth);  // Center the rectangle vertically
-    
-        this.ctx.restore();
-    }
-
     drawStats() {
         this.ctx.font = "36px serif";
         this.ctx.fillText(`Mouse X: ${this.mouseX} Y: ${this.mouseY}`, 10, 50);
-        this.ctx.fillText(`Angle: ${this.angle}`, 10, 100);
     }
 
     update() {
         this.player.move(keysPressed);
         this.drawBackground();
         this.drawGround();
-        
+    
         this.player.draw(this.ctx);
-
+    
         // Rysuj innych graczy
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.ctx);
         }
-
-        this.drawHand();
-
+    
+        // Rysuj rękę gracza z aktualną pozycją myszy
+        this.player.drawHand(this.ctx, this.mouseX, this.mouseY);
+    
         // Sprawdzaj pozycję przy każdej aktualizacji
         this.checkAndEmitPosition();
-
+    
         this.drawStats();
-
+    
         requestAnimationFrame(() => this.update());
     }
 }
