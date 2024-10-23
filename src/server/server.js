@@ -1,21 +1,20 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import cors from 'cors';  // Dodaj CORS
+import cors from 'cors';
 
 const app = express();
 const server = createServer(app);
 
-// Skonfiguruj CORS, aby zezwalać na żądania z frontendowego portu
 app.use(cors({
-    origin: 'http://localhost:5173',  // Zdefiniuj dozwolony frontend
-    methods: ['GET', 'POST'],         // Dozwolone metody
-    credentials: true                 // Pozwól na przesyłanie ciasteczek, jeśli potrzebujesz
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
 }));
 
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173",  // Zdefiniuj dozwolony frontend dla Socket.IO
+        origin: "http://localhost:5173",
         methods: ["GET", "POST"]
     }
 });
@@ -27,13 +26,14 @@ io.on('connection', (socket) => {
 
     // Dodaj nowego gracza
     players[socket.id] = { 
+        id: socket.id,
         x: 400, 
         y: 300,
         handX: 0,
-        handY: 0,
+        handY: 0
     };
 
-    // Wyślij nowemu graczowi pozycje wszystkich innych graczy
+    // Wyślij nowemu graczowi informacje o wszystkich graczach i hoście
     socket.emit('current_players', players);
 
     // Poinformuj pozostałych graczy o nowym graczu
@@ -42,27 +42,31 @@ io.on('connection', (socket) => {
         x: players[socket.id].x, 
         y: players[socket.id].y,
         handX: players[socket.id].handX,
-        handY: players[socket.id].handY 
+        handY: players[socket.id].handY
     });
 
-    // Kiedy gracz się porusza, zaktualizuj jego pozycję i powiadom innych
+    // Obsługa ruchu gracza
     socket.on('player_move', (data) => {
-        players[socket.id] = { 
-            x: data.x, 
-            y: data.y,
-            handX: data.handX,
-            handY: data.handY 
-        };
-        io.emit('update_position', { 
-            id: socket.id, 
-            x: data.x, 
-            y: data.y,
-            handX: data.handX,
-            handY: data.handY 
-        });
+        if (players[socket.id]) {
+            players[socket.id] = {
+                ...players[socket.id],
+                x: data.x, 
+                y: data.y,
+                handX: data.handX,
+                handY: data.handY 
+            };
+            
+            socket.broadcast.emit('update_position', { 
+                id: socket.id, 
+                x: data.x, 
+                y: data.y,
+                handX: data.handX,
+                handY: data.handY 
+            });
+        }
     });
 
-    // Kiedy gracz się rozłącza, usuń go z listy i powiadom innych
+    // Obsługa rozłączenia gracza
     socket.on('disconnect', () => {
         console.log(`Player ${socket.id} disconnected`);
         delete players[socket.id];

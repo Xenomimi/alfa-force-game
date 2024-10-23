@@ -1,4 +1,5 @@
 export class Player {
+    id: string;
     x: number;
     y: number;
     width: number;
@@ -10,9 +11,11 @@ export class Player {
     groundY: number;
     mouseX: number;
     mouseY: number;
+    handEndXY: {x: number, y: number};
 
 
-    constructor(x: number, y: number) {
+    constructor(id: string, x: number, y: number) {
+        this.id = id;
         this.x = x;
         this.y = y;
         this.width = 50;
@@ -24,6 +27,7 @@ export class Player {
         this.groundY = 600; // Ustal poziom ziemi
         this.mouseX = 0;
         this.mouseY = 0;
+        this.handEndXY = {x: 0, y: 0};
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -80,7 +84,10 @@ export class Player {
         // Oblicz końcowy punkt ręki
         const endX = shoulderX + dirX * handLength;
         const endY = shoulderY + dirY * handLength;
-    
+        
+        this.handEndXY.x = endX;
+        this.handEndXY.y = endY;
+
         ctx.beginPath();
         ctx.moveTo(shoulderX, shoulderY);
         ctx.lineTo(endX, endY);
@@ -95,4 +102,8 @@ export class Player {
         ctx.fill();
     }
     
+    getHandPosition() {
+        return this.handEndXY;
+    }
+
 }
