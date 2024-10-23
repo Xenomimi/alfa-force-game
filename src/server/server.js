@@ -26,18 +26,40 @@ io.on('connection', (socket) => {
     console.log('A player connected:', socket.id);
 
     // Dodaj nowego gracza
-    players[socket.id] = { x: 400, y: 300 };
+    players[socket.id] = { 
+        x: 400, 
+        y: 300,
+        handX: 0,
+        handY: 0,
+    };
 
     // Wyślij nowemu graczowi pozycje wszystkich innych graczy
     socket.emit('current_players', players);
 
     // Poinformuj pozostałych graczy o nowym graczu
-    socket.broadcast.emit('new_player', { id: socket.id, x: players[socket.id].x, y: players[socket.id].y });
+    socket.broadcast.emit('new_player', { 
+        id: socket.id, 
+        x: players[socket.id].x, 
+        y: players[socket.id].y,
+        handX: players[socket.id].handX,
+        handY: players[socket.id].handY 
+    });
 
     // Kiedy gracz się porusza, zaktualizuj jego pozycję i powiadom innych
     socket.on('player_move', (data) => {
-        players[socket.id] = { x: data.x, y: data.y };
-        io.emit('update_position', { id: socket.id, x: data.x, y: data.y });
+        players[socket.id] = { 
+            x: data.x, 
+            y: data.y,
+            handX: data.handX,
+            handY: data.handY 
+        };
+        io.emit('update_position', { 
+            id: socket.id, 
+            x: data.x, 
+            y: data.y,
+            handX: data.handX,
+            handY: data.handY 
+        });
     });
 
     // Kiedy gracz się rozłącza, usuń go z listy i powiadom innych

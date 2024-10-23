@@ -8,7 +8,9 @@ export class Player {
     gravity: number;
     verticalSpeed: number;
     groundY: number;
-    previousAngle: number;
+    mouseX: number;
+    mouseY: number;
+
 
     constructor(x: number, y: number) {
         this.x = x;
@@ -20,7 +22,8 @@ export class Player {
         this.gravity = 0.19; // Przyspieszenie grawitacyjne
         this.verticalSpeed = 0; // Początkowa prędkość pionowa
         this.groundY = 600; // Ustal poziom ziemi
-        this.previousAngle = 0;
+        this.mouseX = 0;
+        this.mouseY = 0;
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -61,7 +64,7 @@ export class Player {
     
         // Punkt obrotu (ramię)
         const shoulderX = this.x + this.width / 2;
-        const shoulderY = this.y + (this.height / 3);
+        const shoulderY = this.y + this.height / 3;
     
         // Oblicz wektor kierunku
         let dirX = mouseX - shoulderX;
@@ -82,13 +85,13 @@ export class Player {
         ctx.moveTo(shoulderX, shoulderY);
         ctx.lineTo(endX, endY);
         ctx.lineWidth = handWidth;
-        ctx.strokeStyle = 'red';
+        ctx.strokeStyle = '#ff6c00';
         ctx.stroke();
     
         // Punkt obrotu (ramię)
         ctx.beginPath();
         ctx.arc(shoulderX, shoulderY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = 'blue';
+        ctx.fillStyle = '#38ff00';
         ctx.fill();
     }
     
