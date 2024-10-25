@@ -188,12 +188,12 @@ export class Game {
     }
 
     drawBackground() {
-        this.ctx.fillStyle = 'skyblue';
+        this.ctx.fillStyle = '#5a6170';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
     drawGround() {
-        this.ctx.fillStyle = 'green';
+        this.ctx.fillStyle = '#182224';
         this.ctx.fillRect(0, 600, 1920, 50);
     }
 
@@ -213,19 +213,22 @@ export class Game {
     update() {
         this.player.move(keysPressed);
         this.drawBackground();
+        // Apply semi-transparent layer instead of clearing
+        this.ctx.fillStyle = 'rgba(135, 206, 235, 0.3)'; // skyblue with alpha
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
         this.drawGround();
         
-        // Rysuj aktualnego gracza
-        this.player.draw(this.ctx);
-        this.player.drawHand(this.ctx, this.player.mouseX, this.player.mouseY);
-
-        // Zaktualizuj i rysuj pociski
+        // Update and draw bullets
         this.updateBullets();
         for (const bullet of this.bullets) {
             bullet.draw(this.ctx);
         }
+        
+        // Draw players
+        this.player.draw(this.ctx);
+        this.player.drawHand(this.ctx, this.player.mouseX, this.player.mouseY);
 
-        // Rysuj innych graczy
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.ctx);
             otherPlayers[id].drawHand(this.ctx, otherPlayers[id].mouseX, otherPlayers[id].mouseY);
