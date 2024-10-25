@@ -12,6 +12,8 @@ export class Player {
     mouseX: number;
     mouseY: number;
     handEndXY: {x: number, y: number};
+    gun_model: HTMLImageElement;
+    gun_loaded?: boolean;
 
 
     constructor(id: string, x: number, y: number) {
@@ -28,6 +30,13 @@ export class Player {
         this.mouseX = 0;
         this.mouseY = 0;
         this.handEndXY = {x: 0, y: 0};
+
+        // Inicjalizacja modelu broni
+        this.gun_model = new Image();
+        this.gun_model.src = "/1654.png";
+        this.gun_model.onload = () => {
+            this.gun_loaded = true;
+        };
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -88,18 +97,55 @@ export class Player {
         this.handEndXY.x = endX;
         this.handEndXY.y = endY;
 
+        ctx.save();
+
+        // Rysuj rękę (możesz dostosować pozycję lub kolor)
+        ctx.strokeStyle = '#00FF00';
+        ctx.lineWidth = handWidth;
         ctx.beginPath();
         ctx.moveTo(shoulderX, shoulderY);
         ctx.lineTo(endX, endY);
-        ctx.lineWidth = handWidth;
-        ctx.strokeStyle = '#ff6c00';
         ctx.stroke();
+
+       // Rysuj broń
+       if (this.gun_loaded) {
+        ctx.save();
+
+        // Przesuń kontekst do końca ręki
+        ctx.translate(endX, endY);
+
+        // Oblicz kąt, ale nie odwracaj go w zależności od kierunku
+        const angle = Math.atan2(dirY, dirX);
+
+        // Skaluj broń, jeśli mysz jest po lewej stronie gracza
+        if (dirX < 0) {
+            ctx.rotate(angle + Math.PI);
+            ctx.scale(-1, 1);
+        }
+        else
+            ctx.rotate(angle);
+
+        // Parametry broni
+        const gunWidth = 100;
+        const gunHeight = 40;
+
+        // Rysuj broń (wycentrowana względem rękojeści)
+        ctx.drawImage(
+            this.gun_model,
+            0, -gunHeight / 2,  // Pozycja X i Y (środek broni na linii ręki)
+            gunWidth, gunHeight // Wymiary broni
+        );
+
+        ctx.restore();
+    }
     
         // Punkt obrotu (ramię)
         ctx.beginPath();
         ctx.arc(shoulderX, shoulderY, 3, 0, Math.PI * 2);
         ctx.fillStyle = '#38ff00';
         ctx.fill();
+
+        ctx.restore();
     }
     
     getHandPosition() {

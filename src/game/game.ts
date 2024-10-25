@@ -142,22 +142,40 @@ export class Game {
         });
 
         // Zaktualizuj również obsługę mousedown
-        document.addEventListener('mousedown', (event) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const clickX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
-            const clickY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
-            console.log(`klik X: ${Math.round(clickX)} Y: ${Math.round(clickY)}`);
+        let shootingInterval: NodeJS.Timeout | null = null;
         
-            // Logika strzelania
+        document.addEventListener('mousedown', () => {
+
             const bullet = new Bullet(
                 this.player.handEndXY.x,
                 this.player.handEndXY.y,
-                Math.round(clickX),
-                Math.round(clickY),
+                Math.round(this.mouseX),
+                Math.round(this.mouseY),
                 this.player.id
             );
-        
-            this.bullets.push(bullet); // Dodaj pocisk do tablicy
+            this.bullets.push(bullet); // Dodaj pocisk do tablicyd
+
+            if (!shootingInterval) {
+                shootingInterval = setInterval(() => {
+                    const bullet = new Bullet(
+                        this.player.handEndXY.x,
+                        this.player.handEndXY.y,
+                        Math.round(this.mouseX),
+                        Math.round(this.mouseY),
+                        this.player.id
+                    );
+    
+                    this.bullets.push(bullet); // Dodaj pocisk do tablicy
+                }, 100);
+            }
+        });
+
+        // Zatrzymanie strzelania
+        document.addEventListener('mouseup', () => {
+            if (shootingInterval) {
+                clearInterval(shootingInterval); // Zatrzymaj interwał
+                shootingInterval = null; // Zresetuj zmienną
+            }
         });
     }
 
@@ -204,9 +222,9 @@ export class Game {
             bullet.update();
 
             // Jeśli pocisk jest poza ekranem, usuń go
-            if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
-                this.bullets.splice(i, 1);
-            }
+            // if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
+            //     this.bullets.splice(i, 1);
+            // }
         }
     }
 
