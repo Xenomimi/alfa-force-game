@@ -1,4 +1,4 @@
-// import { Player } from "./player";
+import { Player } from "./player";
 
 export class Bullet {
     x: number;
@@ -95,11 +95,18 @@ export class Bullet {
         return this.x < 0 || this.x > canvasWidth || 
                this.y < 0 || this.y > canvasHeight;
     }
+
     // Sprawdź kolizję z graczem
-    // checkCollision(player: Player): boolean {
-    //     const dx = this.x - player.x;
-    //     const dy = this.y - player.y;
-    //     const distance = Math.sqrt(dx * dx + dy * dy);
-    //     return distance < this.radius + player.radius; // Zakładając, że Player ma właściwość radius
-    // }
+    checkCollision(player: Player): boolean {
+        // Nie pozwól na trafienie własnym pociskiem
+        if (this.playerId === player.id) {
+            return false;
+        }
+    
+        // Sprawdź kolizję z prostokątem gracza
+        return (this.x >= player.x && 
+                this.x <= player.x + player.width &&
+                this.y >= player.y && 
+                this.y <= player.y + player.height);
+    }
 }

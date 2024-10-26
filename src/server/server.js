@@ -66,6 +66,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('player_shoot', (data) => {
+        // Roześlij informację o nowym pocisku do wszystkich innych graczy
+        socket.broadcast.emit('new_bullet', {
+            x: data.x,
+            y: data.y,
+            targetX: data.targetX,
+            targetY: data.targetY,
+            playerId: data.playerId
+        });
+    });
+
+    socket.on('bullet_removed', (data) => {
+        // Roześlij informację o usuniętym pocisku do innych graczy
+        socket.broadcast.emit('bullet_removed', data);
+    });
+
     // Obsługa rozłączenia gracza
     socket.on('disconnect', () => {
         console.log(`Player ${socket.id} disconnected`);

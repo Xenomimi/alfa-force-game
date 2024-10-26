@@ -14,6 +14,10 @@ export class Player {
     handEndXY: {x: number, y: number};
     gun_model: HTMLImageElement;
     gun_loaded?: boolean;
+    isAlive: boolean;
+    health: number;
+    maxHealth: number;
+
 
 
     constructor(id: string, x: number, y: number) {
@@ -30,6 +34,9 @@ export class Player {
         this.mouseX = 0;
         this.mouseY = 0;
         this.handEndXY = {x: 0, y: 0};
+        this.maxHealth = 100;
+        this.health = this.maxHealth;
+        this.isAlive = true;
 
         // Inicjalizacja modelu broni
         this.gun_model = new Image();
@@ -40,8 +47,14 @@ export class Player {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
+        if (!this.isAlive) return;
+
+        // Rysuj gracza
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // Rysuj pasek zdrowia
+        this.drawHealthBar(ctx);
     }
 
     move(keysPressed: { [key: string]: boolean }) {
@@ -62,6 +75,24 @@ export class Player {
             this.y = this.groundY - this.height; // Zatrzymaj gracza na ziemi
             this.verticalSpeed = 0; // Resetuj prędkość pionową
         }
+    }
+
+    takeDamage(damage: number): boolean {
+        this.health = Math.max(0, this.health - damage);
+
+        if (this.health <= 0) {
+            this.isAlive = false;
+        }
+
+        return true;
+    }
+
+    respawn(x: number, y: number) {
+        this.health = this.maxHealth;
+        this.isAlive = true;
+        this.x = x;
+        this.y = y;
+        this.verticalSpeed = 0;
     }
 
     jump() {
@@ -109,35 +140,35 @@ export class Player {
 
        // Rysuj broń
        if (this.gun_loaded) {
-        ctx.save();
+            ctx.save();
 
-        // Przesuń kontekst do końca ręki
-        ctx.translate(endX, endY);
+            // Przesuń kontekst do końca ręki
+            ctx.translate(endX, endY);
 
-        // Oblicz kąt, ale nie odwracaj go w zależności od kierunku
-        const angle = Math.atan2(dirY, dirX);
+            // Oblicz kąt, ale nie odwracaj go w zależności od kierunku
+            const angle = Math.atan2(dirY, dirX);
 
-        // Skaluj broń, jeśli mysz jest po lewej stronie gracza
-        if (dirX < 0) {
-            ctx.rotate(angle + Math.PI);
-            ctx.scale(-1, 1);
+            // Skaluj broń, jeśli mysz jest po lewej stronie gracza
+            if (dirX < 0) {
+                ctx.rotate(angle + Math.PI);
+                ctx.scale(-1, 1);
+            }
+            else
+                ctx.rotate(angle);
+
+            // Parametry broni
+            const gunWidth = 100;
+            const gunHeight = 40;
+
+            // Rysuj broń (wycentrowana względem rękojeści)
+            ctx.drawImage(
+                this.gun_model,
+                0, -gunHeight / 2,  // Pozycja X i Y (środek broni na linii ręki)
+                gunWidth, gunHeight // Wymiary broni
+            );
+
+            ctx.restore();
         }
-        else
-            ctx.rotate(angle);
-
-        // Parametry broni
-        const gunWidth = 100;
-        const gunHeight = 40;
-
-        // Rysuj broń (wycentrowana względem rękojeści)
-        ctx.drawImage(
-            this.gun_model,
-            0, -gunHeight / 2,  // Pozycja X i Y (środek broni na linii ręki)
-            gunWidth, gunHeight // Wymiary broni
-        );
-
-        ctx.restore();
-    }
     
         // Punkt obrotu (ramię)
         ctx.beginPath();
@@ -146,6 +177,39 @@ export class Player {
         ctx.fill();
 
         ctx.restore();
+    }
+
+    drawHealthBar(ctx: CanvasRenderingContext2D) {
+        const barWidth = this.width;
+        const barHeight = 6;
+        const barY = this.y - 15;
+        const healthPercent = this.health / this.maxHealth;
+
+        // Tło paska
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(this.x, barY, barWidth, barHeight);
+
+        // Pasek zdrowia
+        const gradient = ctx.createLinearGradient(this.x, barY, this.x + barWidth * healthPercent, barY);
+        gradient.addColorStop(0, '#00ff00');
+        gradient.addColorStop(1, '#ff0000');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(this.x, barY, barWidth * healthPercent, barHeight);
+
+        // Ramka paska
+        ctx.strokeStyle = '#000';
+        ctx.strokeRect(this.x, barY, barWidth, barHeight);
+
+        // Tekst z wartością zdrowia
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+            `${Math.ceil(this.health)}/${this.maxHealth}`, 
+            this.x + barWidth/2, 
+            barY - 2
+        );
     }
     
     getHandPosition() {

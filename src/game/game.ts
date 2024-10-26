@@ -20,6 +20,14 @@ export class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+        this.player = new Player(socket.id as string, 400, 300);
+        this.prevPlayerPosition = { x: this.player.x, y: this.player.y, mouseX: this.player.mouseX, mouseY: this.player.mouseY};  // Początkowa pozycja gracza
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.bullets = [];
+        this.prevMousePosition = { x: this.mouseX, y: this.mouseY }; // Początkowa pozycja myszy
+        this.canvas.height = 1080;
+        this.canvas.width = 1920;
     
         socket.on('current_players', (players) => {
             for (let id in players) {
@@ -35,52 +43,9 @@ export class Game {
             }
         });
 
-        this.player = new Player(socket.id as string, 400, 300);
-        this.prevPlayerPosition = { x: this.player.x, y: this.player.y, mouseX: this.player.mouseX, mouseY: this.player.mouseY};  // Początkowa pozycja gracza
-        this.mouseX = 0;
-        this.mouseY = 0;
-        this.bullets = [];
-        this.prevMousePosition = { x: this.mouseX, y: this.mouseY }; // Początkowa pozycja myszy
-        this.canvas.height = 1080;
-        this.canvas.width = 1920;
-
-        this.setupEventListeners();
-
-        // Obsługuj aktualizacje stanu gry od serwera
-
-        // Aktualizacja obsługi ruchu ręki innych graczy
-        socket.on('update_hand', (data: { id: string, handX: number, handY: number }) => {
-            if (data.id !== socket.id && otherPlayers[data.id]) {
-                // Aktualizuj pozycję ręki tylko dla innych graczy
-                otherPlayers[data.id].mouseX = data.handX;
-                otherPlayers[data.id].mouseY = data.handY;
-            }
-        });
-
-        // Dodaj obsługę aktualizacji pozycji ręki innych graczy
-        socket.on('update_hand', (data: { id: string, handX: number, handY: number }) => {
-            if (data.id !== socket.id && otherPlayers[data.id]) {
-                // Aktualizuj pozycję ręki tylko dla innych graczy
-                otherPlayers[data.id].mouseX = data.handX;
-                otherPlayers[data.id].mouseY = data.handY;
-            }
-        });
-
-        socket.on('current_players', (players: { [id: string]: { x: number, y: number, handX: number, handY: number }}) => {
-            for (let id in players) {
-                if (id !== socket.id) {
-                    otherPlayers[id] = new Player(id, players[id].x, players[id].y);
-                    otherPlayers[id].mouseX = players[id].handX;
-                    otherPlayers[id].mouseY = players[id].handY;
-                }
-            }
-        });
-
         socket.on('new_player', (data: { id: string, x: number, y: number, handX: number, handY: number }) => {
             if (data.id !== socket.id) {
                 otherPlayers[data.id] = new Player(data.id, data.x, data.y);
-                otherPlayers[data.id].mouseX = data.handX;
-                otherPlayers[data.id].mouseY = data.handY;
             }
         });
 
@@ -93,9 +58,36 @@ export class Game {
             }
         });
 
+        socket.on('new_bullet', (data: {
+            x: number,
+            y: number,
+            targetX: number,
+            targetY: number,
+            playerId: string
+        }) => {
+            const bullet = new Bullet(
+                data.x,
+                data.y,
+                data.targetX,
+                data.targetY,
+                data.playerId
+            );
+            this.bullets.push(bullet);
+        });
+
+        socket.on('bullet_removed', (data: { index: number, playerId: string }) => {
+            // Usuń odpowiedni pocisk, jeśli istnieje
+            this.bullets = this.bullets.filter(bullet => 
+                !(bullet.playerId === data.playerId && 
+                  bullet.isOffscreen(this.canvas.width, this.canvas.height))
+            );
+        });
+
         socket.on('player_disconnected', (data: { id: string }) => {
             delete otherPlayers[data.id];
         });
+
+        this.setupEventListeners();
     }
 
     setupEventListeners() {
@@ -105,13 +97,6 @@ export class Game {
             if (event.key === 'w') {
                 this.player.jump();
             }
-
-            socket.emit('player_move', { 
-                x: this.player.x, 
-                y: this.player.y,
-                handX: this.mouseX,
-                handY: this.mouseY 
-            });
         });
 
         document.addEventListener('keyup', (event) => {
@@ -133,12 +118,6 @@ export class Game {
             // Aktualizuj tylko pozycję ręki aktualnego gracza
             this.player.mouseX = this.mouseX;
             this.player.mouseY = this.mouseY;
-
-            // Wyślij aktualizację pozycji ręki na serwer
-            socket.emit('hand_move', {
-                handX: this.mouseX,
-                handY: this.mouseY
-            });
         });
 
         // Zaktualizuj również obsługę mousedown
@@ -153,7 +132,15 @@ export class Game {
                 Math.round(this.mouseY),
                 this.player.id
             );
-            this.bullets.push(bullet); // Dodaj pocisk do tablicyd
+            this.bullets.push(bullet); // Dodaj pocisk do tablicy
+
+            socket.emit('player_shoot', {
+                x: this.player.handEndXY.x,
+                y: this.player.handEndXY.y,
+                targetX: Math.round(this.mouseX),
+                targetY: Math.round(this.mouseY),
+                playerId: this.player.id
+            });
 
             if (!shootingInterval) {
                 shootingInterval = setInterval(() => {
@@ -166,7 +153,15 @@ export class Game {
                     );
     
                     this.bullets.push(bullet); // Dodaj pocisk do tablicy
-                }, 100);
+
+                    socket.emit('player_shoot', {
+                        x: this.player.handEndXY.x,
+                        y: this.player.handEndXY.y,
+                        targetX: Math.round(this.mouseX),
+                        targetY: Math.round(this.mouseY),
+                        playerId: this.player.id
+                    });
+                }, 50);
             }
         });
 
@@ -220,12 +215,72 @@ export class Game {
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const bullet = this.bullets[i];
             bullet.update();
-
-            // Jeśli pocisk jest poza ekranem, usuń go
-            // if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
-            //     this.bullets.splice(i, 1);
-            // }
+    
+            // Sprawdź kolizje tylko dla żywych graczy
+            if (this.player.isAlive && bullet.checkCollision(this.player)) {
+                this.handlePlayerHit(bullet.playerId);
+                this.bullets.splice(i, 1);
+                continue;
+            }
+    
+            // Sprawdź kolizje z innymi graczami
+            for (let id in otherPlayers) {
+                const otherPlayer = otherPlayers[id];
+                if (otherPlayer.isAlive && bullet.checkCollision(otherPlayer)) {
+                    socket.emit('player_hit', {
+                        hitPlayerId: otherPlayer.id,
+                        bulletPlayerId: bullet.playerId
+                    });
+                    this.bullets.splice(i, 1);
+                    break;
+                }
+            }
+            if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
+                this.bullets.splice(i, 1);
+            }
         }
+    }
+
+    handlePlayerHit(shooterId: string, damage: number = 10) {
+        if (!this.player.isAlive) return;
+    
+        // Próba zadania obrażeń z uwzględnieniem czasu niewrażliwości
+        if (this.player.takeDamage(damage)) {
+            // Wyślij aktualizację stanu zdrowia do innych graczy
+            socket.emit('health_update', {
+                playerId: this.player.id,
+                health: this.player.health,
+                isAlive: this.player.isAlive
+            });
+    
+            // Jeśli gracz zmarł
+            if (!this.player.isAlive) {
+                this.handlePlayerDeath(shooterId);
+            }
+        }
+    }
+
+    handlePlayerDeath(killerId: string) {
+        // Wyślij informację o śmierci
+        socket.emit('player_death', {
+            playerId: this.player.id,
+            killerId: killerId
+        });
+    
+        // Rozpocznij odliczanie do respawnu
+        setTimeout(() => {
+            const respawnX = Math.random() * (this.canvas.width - this.player.width);
+            const respawnY = 300;
+            
+            this.player.respawn(respawnX, respawnY);
+            
+            // Poinformuj innych o respawnie
+            socket.emit('player_respawn', {
+                playerId: this.player.id,
+                x: respawnX,
+                y: respawnY
+            });
+        }, 3000); // 3 sekundy do respawnu
     }
 
     update() {
