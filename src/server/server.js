@@ -30,7 +30,9 @@ io.on('connection', (socket) => {
         x: 400, 
         y: 300,
         handX: 0,
-        handY: 0
+        handY: 0,
+        health: 100,
+        isAlive: true
     };
 
     // Wyślij nowemu graczowi informacje o wszystkich graczach i hoście
@@ -42,7 +44,9 @@ io.on('connection', (socket) => {
         x: players[socket.id].x, 
         y: players[socket.id].y,
         handX: players[socket.id].handX,
-        handY: players[socket.id].handY
+        handY: players[socket.id].handY,
+        health: players[socket.id].health,
+        isAlive: players[socket.id].isAlive
     });
 
     // Obsługa ruchu gracza
@@ -80,6 +84,37 @@ io.on('connection', (socket) => {
     socket.on('bullet_removed', (data) => {
         // Roześlij informację o usuniętym pocisku do innych graczy
         socket.broadcast.emit('bullet_removed', data);
+    });
+
+    socket.on('health_update', (data) => {
+        if (players[data.playerId]) {
+            players[data.playerId].health = data.health;
+            players[data.playerId].isAlive = data.isAlive;
+            
+            // Przekaż aktualizację do wszystkich graczy
+            io.emit('player_health_update', {
+                playerId: data.playerId,
+                health: data.health,
+                isAlive: data.isAlive
+            });
+        }
+    });
+
+    socket.on('player_respawn', (data) => {
+        if (players[data.playerId]) {
+            players[data.playerId].health = 100;
+            players[data.playerId].isAlive = true;
+            players[data.playerId].x = data.x;
+            players[data.playerId].y = data.y;
+
+            io.emit('player_respawned', {
+                playerId: data.playerId,
+                x: data.x,
+                y: data.y,
+                health: 100,
+                isAlive: true
+            });
+        }
     });
 
     // Obsługa rozłączenia gracza

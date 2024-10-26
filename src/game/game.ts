@@ -28,6 +28,40 @@ export class Game {
         this.prevMousePosition = { x: this.mouseX, y: this.mouseY }; // Początkowa pozycja myszy
         this.canvas.height = 1080;
         this.canvas.width = 1920;
+
+        socket.on('player_health_update', (data: {
+            playerId: string,
+            health: number,
+            isAlive: boolean
+        }) => {
+            if (data.playerId === this.player.id) {
+                this.player.health = data.health;
+                this.player.isAlive = data.isAlive;
+            } else if (otherPlayers[data.playerId]) {
+                otherPlayers[data.playerId].health = data.health;
+                otherPlayers[data.playerId].isAlive = data.isAlive;
+            }
+        });
+
+        socket.on('player_respawned', (data: {
+            playerId: string,
+            x: number,
+            y: number,
+            health: number,
+            isAlive: boolean
+        }) => {
+            if (data.playerId === this.player.id) {
+                this.player.health = data.health;
+                this.player.isAlive = data.isAlive;
+                this.player.x = data.x;
+                this.player.y = data.y;
+            } else if (otherPlayers[data.playerId]) {
+                otherPlayers[data.playerId].health = data.health;
+                otherPlayers[data.playerId].isAlive = data.isAlive;
+                otherPlayers[data.playerId].x = data.x;
+                otherPlayers[data.playerId].y = data.y;
+            }
+        });
     
         socket.on('current_players', (players) => {
             for (let id in players) {
@@ -92,6 +126,9 @@ export class Game {
 
     setupEventListeners() {
         document.addEventListener('keydown', (event) => {
+
+            if (!this.player.isAlive) return;
+
             keysPressed[event.key] = true;
 
             if (event.key === 'w') {
@@ -100,6 +137,9 @@ export class Game {
         });
 
         document.addEventListener('keyup', (event) => {
+
+            if (!this.player.isAlive) return;
+
             keysPressed[event.key] = false;
         });
 
@@ -120,62 +160,14 @@ export class Game {
             this.player.mouseY = this.mouseY;
         });
 
-        // Zaktualizuj również obsługę mousedown
-        let shootingInterval: NodeJS.Timeout | null = null;
-        
-        document.addEventListener('mousedown', () => {
-
-            const bullet = new Bullet(
-                this.player.handEndXY.x,
-                this.player.handEndXY.y,
-                Math.round(this.mouseX),
-                Math.round(this.mouseY),
-                this.player.id
-            );
-            this.bullets.push(bullet); // Dodaj pocisk do tablicy
-
-            socket.emit('player_shoot', {
-                x: this.player.handEndXY.x,
-                y: this.player.handEndXY.y,
-                targetX: Math.round(this.mouseX),
-                targetY: Math.round(this.mouseY),
-                playerId: this.player.id
-            });
-
-            if (!shootingInterval) {
-                shootingInterval = setInterval(() => {
-                    const bullet = new Bullet(
-                        this.player.handEndXY.x,
-                        this.player.handEndXY.y,
-                        Math.round(this.mouseX),
-                        Math.round(this.mouseY),
-                        this.player.id
-                    );
-    
-                    this.bullets.push(bullet); // Dodaj pocisk do tablicy
-
-                    socket.emit('player_shoot', {
-                        x: this.player.handEndXY.x,
-                        y: this.player.handEndXY.y,
-                        targetX: Math.round(this.mouseX),
-                        targetY: Math.round(this.mouseY),
-                        playerId: this.player.id
-                    });
-                }, 50);
-            }
-        });
-
-        // Zatrzymanie strzelania
-        document.addEventListener('mouseup', () => {
-            if (shootingInterval) {
-                clearInterval(shootingInterval); // Zatrzymaj interwał
-                shootingInterval = null; // Zresetuj zmienną
-            }
-        });
+        // Logika strzelania
+        this.handlePlayerShooting()
     }
 
     // Sprawdź, czy pozycja gracza się zmieniła i wyślij tylko wtedy
     checkAndEmitPosition() {
+        if (!this.player.isAlive) return;
+
         if (this.player.x !== this.prevPlayerPosition.x || 
             this.player.y !== this.prevPlayerPosition.y || 
             this.player.mouseX !== this.prevPlayerPosition.mouseX ||
@@ -240,20 +232,72 @@ export class Game {
             }
         }
     }
+    handlePlayerShooting() {
+        let shootingInterval: NodeJS.Timeout | null = null;
+        
+        document.addEventListener('mousedown', () => {
+
+            if(!this.player.isAlive) return
+
+            const bullet = new Bullet(
+                this.player.handEndXY.x,
+                this.player.handEndXY.y,
+                Math.round(this.mouseX),
+                Math.round(this.mouseY),
+                this.player.id
+            );
+            this.bullets.push(bullet); // Dodaj pocisk do tablicy
+
+            socket.emit('player_shoot', {
+                x: this.player.handEndXY.x,
+                y: this.player.handEndXY.y,
+                targetX: Math.round(this.mouseX),
+                targetY: Math.round(this.mouseY),
+                playerId: this.player.id
+            });
+
+            if (!shootingInterval) {
+                shootingInterval = setInterval(() => {
+                    const bullet = new Bullet(
+                        this.player.handEndXY.x,
+                        this.player.handEndXY.y,
+                        Math.round(this.mouseX),
+                        Math.round(this.mouseY),
+                        this.player.id
+                    );
+    
+                    this.bullets.push(bullet); // Dodaj pocisk do tablicy
+
+                    socket.emit('player_shoot', {
+                        x: this.player.handEndXY.x,
+                        y: this.player.handEndXY.y,
+                        targetX: Math.round(this.mouseX),
+                        targetY: Math.round(this.mouseY),
+                        playerId: this.player.id
+                    });
+                }, 50);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (shootingInterval) {
+                clearInterval(shootingInterval); // Zatrzymaj interwał
+                shootingInterval = null; // Zresetuj zmienną
+            }
+        });
+    }
 
     handlePlayerHit(shooterId: string, damage: number = 10) {
         if (!this.player.isAlive) return;
     
-        // Próba zadania obrażeń z uwzględnieniem czasu niewrażliwości
         if (this.player.takeDamage(damage)) {
-            // Wyślij aktualizację stanu zdrowia do innych graczy
             socket.emit('health_update', {
                 playerId: this.player.id,
                 health: this.player.health,
-                isAlive: this.player.isAlive
+                isAlive: this.player.isAlive,
+                killerId: shooterId
             });
     
-            // Jeśli gracz zmarł
             if (!this.player.isAlive) {
                 this.handlePlayerDeath(shooterId);
             }
@@ -261,30 +305,33 @@ export class Game {
     }
 
     handlePlayerDeath(killerId: string) {
-        // Wyślij informację o śmierci
+        this.player.isAlive = false;
+        this.player.deathTime = Date.now();
+        this.player.killerId = killerId; // Ustawienie ID zabójcy
+    
         socket.emit('player_death', {
             playerId: this.player.id,
             killerId: killerId
         });
     
-        // Rozpocznij odliczanie do respawnu
         setTimeout(() => {
             const respawnX = Math.random() * (this.canvas.width - this.player.width);
             const respawnY = 300;
             
             this.player.respawn(respawnX, respawnY);
             
-            // Poinformuj innych o respawnie
             socket.emit('player_respawn', {
                 playerId: this.player.id,
                 x: respawnX,
                 y: respawnY
             });
-        }, 3000); // 3 sekundy do respawnu
+        }, 5000);
     }
 
     update() {
-        this.player.move(keysPressed);
+        if (this.player.isAlive) {
+            this.player.move(keysPressed);
+        }
         this.drawBackground();
         // Apply semi-transparent layer instead of clearing
         this.ctx.fillStyle = 'rgba(135, 206, 235, 0.3)'; // skyblue with alpha
@@ -300,11 +347,15 @@ export class Game {
         
         // Draw players
         this.player.draw(this.ctx);
-        this.player.drawHand(this.ctx, this.player.mouseX, this.player.mouseY);
+        // this.player.drawHand(this.ctx, this.player.mouseX, this.player.mouseY);
 
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.ctx);
-            otherPlayers[id].drawHand(this.ctx, otherPlayers[id].mouseX, otherPlayers[id].mouseY);
+        }
+
+        if (!this.player.isAlive) {
+            this.player.drawDeathAnimation(this.ctx);
+            this.player.drawDeathScreen(this.ctx);
         }
 
         this.checkAndEmitPosition();
