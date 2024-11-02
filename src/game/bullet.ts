@@ -22,17 +22,23 @@ export class Bullet {
         this.radius = 4;
         this.playerId = playerId;
         this.trail = [];
-
-        // Calculate direction
+    
+        // Oblicz wektor kierunku
         const dx = targetX - x;
         const dy = targetY - y;
         const length = Math.sqrt(dx * dx + dy * dy);
-        
-        this.directionX = dx / length;
-        this.directionY = dy / length;
-        
-        // Calculate angle for rotation
-        this.angle = Math.atan2(dy, dx);
+    
+        // Sprawdź, czy długość nie jest zerowa, aby uniknąć dzielenia przez zero
+        if (length !== 0) {
+            this.directionX = dx / length;
+            this.directionY = dy / length;
+        } else {
+            this.directionX = 0;
+            this.directionY = 0;
+        }
+    
+        // Oblicz kąt do rotacji (jeśli potrzebne)
+        this.angle = Math.atan2(this.directionY, this.directionX);
     }
 
     update() {
@@ -98,15 +104,17 @@ export class Bullet {
 
     // Sprawdź kolizję z graczem
     checkCollision(player: Player): boolean {
-        // Nie pozwól na trafienie własnym pociskiem
         if (this.playerId === player.id) {
             return false;
         }
-    
-        // Sprawdź kolizję z prostokątem gracza
-        return (this.x >= player.x && 
-                this.x <= player.x + player.width &&
-                this.y >= player.y && 
-                this.y <= player.y + player.height);
+
+        return this.checkRectCollision(this.x, this.y, player.headHitbox) ||
+               this.checkRectCollision(this.x, this.y, player.torsoHitbox) ||
+               this.checkRectCollision(this.x, this.y, player.legHitbox);
+    }
+
+    private checkRectCollision(x: number, y: number, rect: { x: number, y: number, width: number, height: number }): boolean {
+        return (x >= rect.x && x <= rect.x + rect.width &&
+                y >= rect.y && y <= rect.y + rect.height);
     }
 }

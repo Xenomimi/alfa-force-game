@@ -24,15 +24,25 @@ const players = {};
 io.on('connection', (socket) => {
     console.log('A player connected:', socket.id);
 
+    // Stałe wartości początkowe pozycji gracza
+    const startX = 400;
+    const startY = 300;
+
     // Dodaj nowego gracza
-    players[socket.id] = { 
+    players[socket.id] = {
         id: socket.id,
-        x: 400, 
-        y: 300,
+        x: startX,
+        y: startY,
         handX: 0,
         handY: 0,
         health: 100,
-        isAlive: true
+        isAlive: true,
+        legSwingDirection: 1,
+        thighSwingAngle: 0,
+        calfSwingAngle: 0,
+        headHitbox: { x: startX, y: startY },
+        torsoHitbox: { x: startX, y: startY + 12 },
+        legHitbox: { x: startX, y: startY + 12 + 37 - 12 }
     };
 
     // Wyślij nowemu graczowi informacje o wszystkich graczach i hoście
@@ -46,7 +56,13 @@ io.on('connection', (socket) => {
         handX: players[socket.id].handX,
         handY: players[socket.id].handY,
         health: players[socket.id].health,
-        isAlive: players[socket.id].isAlive
+        isAlive: players[socket.id].isAlive,
+        legSwingDirection: players[socket.id].legSwingDirection,
+        thighSwingAngle: players[socket.id].thighSwingAngle,
+        calfSwingAngle: players[socket.id].calfSwingAngle,
+        headHitbox: players[socket.id].headHitbox,
+        torsoHitbox: players[socket.id].torsoHitbox,
+        legHitbox: players[socket.id].legHitbox
     });
 
     // Obsługa ruchu gracza
@@ -54,36 +70,48 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id] = {
                 ...players[socket.id],
-                x: data.x, 
+                x: data.x,
                 y: data.y,
                 handX: data.handX,
-                handY: data.handY 
+                handY: data.handY,
+                legSwingDirection: data.legSwingDirection,
+                thighSwingAngle: data.thighSwingAngle,
+                calfSwingAngle: data.calfSwingAngle,
+                headHitbox: { x: data.headHitbox.x, y: data.headHitbox.y },
+                torsoHitbox: { x: data.torsoHitbox.x, y: data.torsoHitbox.y },
+                legHitbox: { x: data.legHitbox.x, y: data.legHitbox.y }
             };
-            
-            socket.broadcast.emit('update_position', { 
-                id: socket.id, 
-                x: data.x, 
-                y: data.y,
-                handX: data.handX,
-                handY: data.handY 
-            });
+    
+            socket.broadcast.emit('update_position', players[socket.id]);
         }
     });
 
     socket.on('player_shoot', (data) => {
-        // Roześlij informację o nowym pocisku do wszystkich innych graczy
-        socket.broadcast.emit('new_bullet', {
-            x: data.x,
-            y: data.y,
-            targetX: data.targetX,
-            targetY: data.targetY,
-            playerId: data.playerId
-        });
+        socket.broadcast.emit('new_bullet', data);
     });
 
     socket.on('bullet_removed', (data) => {
         // Roześlij informację o usuniętym pocisku do innych graczy
         socket.broadcast.emit('bullet_removed', data);
+    });
+
+    socket.on('player_hit', (data) => {
+        const { hitPlayerId, bulletPlayerId } = data;
+        const hitPlayer = players[hitPlayerId];
+        
+        if (hitPlayer && hitPlayer.isAlive) {
+            hitPlayer.health -= 10; // Przykładowa wartość obrażeń
+            if (hitPlayer.health <= 0) {
+                hitPlayer.health = 0;
+                hitPlayer.isAlive = false;
+            }
+            
+            io.emit('player_health_update', {
+                playerId: hitPlayerId,
+                health: hitPlayer.health,
+                isAlive: hitPlayer.isAlive
+            });
+        }
     });
 
     socket.on('health_update', (data) => {
@@ -106,13 +134,27 @@ io.on('connection', (socket) => {
             players[data.playerId].isAlive = true;
             players[data.playerId].x = data.x;
             players[data.playerId].y = data.y;
+            players[data.playerId].legSwingDirection = data.legSwingDirection;
+            players[data.playerId].thighSwingAngle = data.thighSwingAngle;
+            players[data.playerId].calfSwingAngle = data.calfSwingAngle;
+
+            // Aktualizacja hitboxów przy respawnie
+            players[data.playerId].headHitbox = { x: data.x, y: data.y };    
+            players[data.playerId].torsoHitbox = { x: data.x, y: data.y + 12 };    
+            players[data.playerId].legHitbox = { x: data.x, y: data.y + 12 + 37 - 12 };
 
             io.emit('player_respawned', {
                 playerId: data.playerId,
                 x: data.x,
                 y: data.y,
                 health: 100,
-                isAlive: true
+                isAlive: true,
+                legSwingDirection: 1,
+                thighSwingAngle: 0,
+                calfSwingAngle: 0,
+                headHitbox: { x: data.x, y: data.y },
+                torsoHitbox: { x: data.x, y: data.y + 12 },
+                legHitbox: { x: data.x, y: data.y + 12 + 37 - 12 }
             });
         }
     });
