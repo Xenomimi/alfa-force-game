@@ -16,11 +16,7 @@ const App: React.FC = () => {
     }, []);
 
     return (
-        <div>
-            <h1>AlfaForce</h1>
-            <p>Gra 2D Multiplayer Shooter</p>
-            <canvas id="gameCanvas" width="1600" height="1048"></canvas>
-        </div>
+        <canvas id="gameCanvas" width="1600" height="1048"></canvas>
     );
 };
 

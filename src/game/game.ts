@@ -44,8 +44,8 @@ export class Game {
         this.mouseY = 0;
         this.bullets = [];
         this.prevMousePosition = { x: this.mouseX, y: this.mouseY };
-        this.canvas.height = 1080;
-        this.canvas.width = 1920;
+        this.canvas.height = 1048;
+        this.canvas.width = 1600;
         // Dźwięk broni
         this.shootSound = new Audio('/snd_weapon_14.mp3');
         this.shootSound.volume = 0.05; // Set volume (0.0 to 1.0)
