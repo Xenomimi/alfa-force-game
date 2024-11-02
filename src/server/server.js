@@ -95,24 +95,27 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('bullet_removed', data);
     });
 
-    socket.on('player_hit', (data) => {
-        const { hitPlayerId, bulletPlayerId } = data;
-        const hitPlayer = players[hitPlayerId];
+    // socket.on('player_hit', (data) => {
+    //     const { hitPlayerId, bulletPlayerId } = data;
+    //     const hitPlayer = players[hitPlayerId];
         
-        if (hitPlayer && hitPlayer.isAlive) {
-            hitPlayer.health -= 10; // Przykładowa wartość obrażeń
-            if (hitPlayer.health <= 0) {
-                hitPlayer.health = 0;
-                hitPlayer.isAlive = false;
-            }
+    //     if (hitPlayer && hitPlayer.isAlive) {
+    //         hitPlayer.health -= 10; // Przykładowa wartość obrażeń
+    //         if (hitPlayer.health <= 0) {
+    //             hitPlayer.health = 0;
+    //             hitPlayer.isAlive = false;
+    //         }
             
-            io.emit('player_health_update', {
-                playerId: hitPlayerId,
-                health: hitPlayer.health,
-                isAlive: hitPlayer.isAlive
-            });
-        }
-    });
+    //         io.emit('player_health_update', {
+    //             playerId: hitPlayerId,
+    //             health: hitPlayer.health,
+    //             isAlive: hitPlayer.isAlive
+    //         });
+    
+    //         // Wyemituj zdarzenie usunięcia pocisku na podstawie bulletPlayerId
+    //         io.emit('bullet_removed', { playerId: bulletPlayerId });
+    //     }
+    // });
 
     socket.on('health_update', (data) => {
         if (players[data.playerId]) {
@@ -137,8 +140,6 @@ io.on('connection', (socket) => {
             players[data.playerId].legSwingDirection = data.legSwingDirection;
             players[data.playerId].thighSwingAngle = data.thighSwingAngle;
             players[data.playerId].calfSwingAngle = data.calfSwingAngle;
-
-            // Aktualizacja hitboxów przy respawnie
             players[data.playerId].headHitbox = { x: data.x, y: data.y };    
             players[data.playerId].torsoHitbox = { x: data.x, y: data.y + 12 };    
             players[data.playerId].legHitbox = { x: data.x, y: data.y + 12 + 37 - 12 };

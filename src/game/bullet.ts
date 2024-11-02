@@ -18,7 +18,7 @@ export class Bullet {
         this.y = y;
         this.lastX = x;
         this.lastY = y;
-        this.speed = 30; // Zwiększona prędkość
+        this.speed = 30;
         this.radius = 4;
         this.playerId = playerId;
         this.trail = [];
@@ -104,17 +104,33 @@ export class Bullet {
 
     // Sprawdź kolizję z graczem
     checkCollision(player: Player): boolean {
-        if (this.playerId === player.id) {
-            return false;
+        // Sprawdź kolizję z prostokątnym hitboxem gracza poprzez linię między `lastX`, `lastY` a `x`, `y`
+        
+        // Parametry hitboxu gracza
+        const playerLeft = player.x;
+        const playerRight = player.x + player.width;
+        const playerTop = player.y;
+        const playerBottom = player.y + player.height;
+    
+        // Liczba substeps zależna od prędkości pocisku
+        const steps = Math.ceil(this.speed / this.radius);
+        
+        // Iteruj po interpolowanych punktach między `lastX`, `lastY` a `x`, `y`
+        for (let i = 0; i <= steps; i++) {
+            const ratio = i / steps;
+            const interpolatedX = this.lastX + (this.x - this.lastX) * ratio;
+            const interpolatedY = this.lastY + (this.y - this.lastY) * ratio;
+    
+            // Sprawdź, czy interpolowany punkt znajduje się wewnątrz hitboxu gracza
+            if (
+                interpolatedX >= playerLeft &&
+                interpolatedX <= playerRight &&
+                interpolatedY >= playerTop &&
+                interpolatedY <= playerBottom
+            ) {
+                return true; // Wykryto kolizję
+            }
         }
-
-        return this.checkRectCollision(this.x, this.y, player.headHitbox) ||
-               this.checkRectCollision(this.x, this.y, player.torsoHitbox) ||
-               this.checkRectCollision(this.x, this.y, player.legHitbox);
-    }
-
-    private checkRectCollision(x: number, y: number, rect: { x: number, y: number, width: number, height: number }): boolean {
-        return (x >= rect.x && x <= rect.x + rect.width &&
-                y >= rect.y && y <= rect.y + rect.height);
+        return false; // Brak kolizji
     }
 }

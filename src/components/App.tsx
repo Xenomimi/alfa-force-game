@@ -3,7 +3,7 @@ import { Game } from '../game/game';
 import '../styles/style.css'
 
 
-import Login from './Login';
+// import Login from './Login';
 
 const App: React.FC = () => {
     React.useEffect(() => {
@@ -19,7 +19,7 @@ const App: React.FC = () => {
         <div>
             <h1>AlfaForce</h1>
             <p>Gra 2D Multiplayer Shooter</p>
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <canvas id="gameCanvas" width="1600" height="1048"></canvas>
         </div>
     );
 };

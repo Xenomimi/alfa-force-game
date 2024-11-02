@@ -404,8 +404,6 @@ export class Player {
         ctx.restore();
     }
     
-    
-    
     drawDeathAnimation(ctx: CanvasRenderingContext2D) {
         if (!this.deathTime) return;  // Ensure deathTime is set
     
@@ -487,11 +485,11 @@ export class Player {
 
     takeDamage(damage: number): boolean {
         this.health = Math.max(0, this.health - damage);
-
-        if (this.health <= 0) {
-            this.isAlive = false;
+    
+        if (this.health <= 0 && this.isAlive) {
+            this.die();
         }
-
+    
         return true;
     }
 

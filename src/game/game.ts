@@ -5,10 +5,16 @@ import { Bullet } from "./bullet";
 const socket = io('http://localhost:3000');
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};  // Przechowuj pozostałych graczy
+const cameraWidth = 800; // szerokość widocznego obszaru (kamery)
+const cameraHeight = 600; // wysokość widocznego obszaru (kamery)
 
 export class Game {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    backgroundImage: HTMLImageElement;
+    collisionImage: HTMLImageElement;
+    cameraX: number;
+    cameraY: number;
     player: Player;
     prevPlayerPosition: { x: number, y: number, mouseX: number, mouseY: number };
     prevMousePosition: { x: number, y: number };
@@ -21,19 +27,26 @@ export class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+        this.backgroundImage = new Image();
+        this.backgroundImage.src = "./map.jpg";
+        this.collisionImage = new Image();
+        this.collisionImage.src = "./11a.jpg";
+        this.cameraX = 0;
+        this.cameraY = 0;
         this.player = new Player(socket.id as string, 850, 300);
         this.prevPlayerPosition = { 
             x: this.player.x, 
             y: this.player.y, 
             mouseX: this.player.mouseX, 
             mouseY: this.player.mouseY
-        };  // Początkowa pozycja gracza
+        };
         this.mouseX = 0;
         this.mouseY = 0;
         this.bullets = [];
-        this.prevMousePosition = { x: this.mouseX, y: this.mouseY }; // Początkowa pozycja myszy
+        this.prevMousePosition = { x: this.mouseX, y: this.mouseY };
         this.canvas.height = 1080;
         this.canvas.width = 1920;
+        // Dźwięk broni
         this.shootSound = new Audio('/snd_weapon_14.mp3');
         this.shootSound.volume = 0.05; // Set volume (0.0 to 1.0)
 
@@ -185,6 +198,16 @@ export class Game {
         this.setupEventListeners();
     }
 
+    updateCamera(playerX: number, playerY: number) {
+        // Ustaw kamerę na gracza, ale z uwzględnieniem ograniczeń mapy
+        this.cameraX = playerX - cameraWidth / 2;
+        this.cameraY = playerY - cameraHeight / 2;
+    
+        // Ograniczenia kamery - nie może wyjść poza granice mapy
+        this.cameraX = Math.max(0, Math.min(this.cameraX, this.backgroundImage.width - cameraWidth));
+        this.cameraY = Math.max(0, Math.min(this.cameraY, this.backgroundImage.height - cameraHeight));
+    }
+
     setupEventListeners() {
         document.addEventListener('keydown', (event) => {
 
@@ -270,6 +293,31 @@ export class Game {
         this.ctx.fillRect(0, 600, 1920, 50);
     }
 
+    // drawMap() {
+    //     // Wyczyszczenie kanwasu
+    //     this.ctx.clearRect(0, 0, cameraWidth, cameraHeight);
+
+    //     // Rysowanie tła mapy przesuniętego o pozycję kamery
+    //     this.ctx.drawImage(
+    //         this.backgroundImage,
+    //         this.cameraX, this.cameraY, cameraWidth, cameraHeight,
+    //         0, 0, cameraWidth, cameraHeight
+    //     );
+    // }
+
+    checkMapCollision(playerX: number, playerY: number): boolean {
+        const collisionCanvas = document.createElement('canvas');
+        const collisionCtx = collisionCanvas.getContext('2d')!;
+        collisionCanvas.width = this.collisionImage.width;
+        collisionCanvas.height = this.collisionImage.height;
+    
+        collisionCtx.drawImage(this.collisionImage, 0, 0);
+        const pixelData = collisionCtx.getImageData(playerX, playerY, 1, 1).data;
+    
+        // Sprawdzamy, czy piksel nie jest przezroczysty (np. ma niezerową wartość alfa)
+        return pixelData[3] !== 0;
+    }
+
     // Zaktualizuj pociski
     updateBullets() {
         for (let i = this.bullets.length - 1; i >= 0; i--) {
@@ -277,9 +325,8 @@ export class Game {
             bullet.update();
     
             // Sprawdź kolizje tylko dla żywych graczy
-            if (this.player.isAlive && bullet.checkCollision(this.player)) {
+            if (this.player.isAlive && bullet.checkCollision(this.player) && this.player.id !== bullet.playerId) {
                 this.handlePlayerHit(bullet.playerId);
-                socket.emit('bullet_removed', { index: i, playerId: bullet.playerId });
                 this.bullets.splice(i, 1);
                 continue;
             }
@@ -292,16 +339,32 @@ export class Game {
                         hitPlayerId: otherPlayer.id,
                         bulletPlayerId: bullet.playerId
                     });
-                    socket.emit('bullet_removed', { index: i, playerId: bullet.playerId });
                     this.bullets.splice(i, 1);
                     break;
                 }
             }
-    
-            // Usuń pocisk, jeśli jest poza ekranem
             if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
-                socket.emit('bullet_removed', { index: i, playerId: bullet.playerId });
                 this.bullets.splice(i, 1);
+            }
+        }
+    }
+
+    
+    handlePlayerHit(shooterId: string, damage: number = 10) {
+        if (!this.player.isAlive) return;
+    
+        // Próba zadania obrażeń z uwzględnieniem czasu niewrażliwości
+        if (this.player.takeDamage(damage)) {
+            // Wyślij aktualizację stanu zdrowia do innych graczy
+            socket.emit('health_update', {
+                playerId: this.player.id,
+                health: this.player.health,
+                isAlive: this.player.isAlive
+            });
+    
+            // Jeśli gracz zmarł
+            if (!this.player.isAlive) {
+                this.handlePlayerDeath(shooterId);
             }
         }
     }
@@ -370,23 +433,6 @@ export class Game {
         });
     }
 
-    handlePlayerHit(shooterId: string, damage: number = 10) {
-        if (!this.player.isAlive) return;
-    
-        if (this.player.takeDamage(damage)) {
-            socket.emit('health_update', {
-                playerId: this.player.id,
-                health: this.player.health,
-                isAlive: this.player.isAlive,
-                killerId: shooterId
-            });
-    
-            if (!this.player.isAlive) {
-                this.handlePlayerDeath(shooterId);
-            }
-        }
-    }
-
     handlePlayerDeath(killerId: string) {
         this.player.isAlive = false;
         this.player.deathTime = Date.now();
@@ -406,33 +452,41 @@ export class Game {
             socket.emit('player_respawn', {
                 playerId: this.player.id,
                 x: respawnX,
-                y: respawnY
+                y: respawnY,
+                legSwingDirection: 0,
+                thighSwingAngle: 0,
+                calfSwingAngle: 1,
+                headHitbox: { x: respawnX, y: respawnY },
+                torsoHitbox: { x: respawnX, y: respawnY + 12 },
+                legHitbox: { x: respawnX, y: respawnY + 12 + 37 - 12 }
             });
         }, 5000);
     }
 
     update() {
+        // Bloku ruch gracza jeżeli jest martwy
         if (this.player.isAlive) {
             this.player.move(keysPressed);
+            // this.updateCamera(this.player.x, this.player.y);
         }
+
+        // Rysowanie mapy
+        // this.drawMap();
+
         this.drawBackground();
-        // Apply semi-transparent layer instead of clearing
-        this.ctx.fillStyle = 'rgba(135, 206, 235, 0.3)'; // skyblue with alpha
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
         this.drawGround();
         
-        // Update and draw bullets
-        this.updateBullets();
-        for (const bullet of this.bullets) {
-            bullet.draw(this.ctx);
-        }
-        
-        // Draw players
+        // Rysowanie gracza
         this.player.draw(this.ctx);
 
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.ctx);
+        }
+
+        // Aktualizacja pocisków
+        this.updateBullets();
+        for (const bullet of this.bullets) {
+            bullet.draw(this.ctx);
         }
 
         if (!this.player.isAlive) {
