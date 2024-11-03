@@ -393,8 +393,8 @@ export class Game {
             const bullet = new Bullet(
                 this.player.getHandPosition().x,
                 this.player.getHandPosition().y,
-                Math.round(this.mouseX),
-                Math.round(this.mouseY),
+                this.player.getShoulderPosition().x,
+                this.player.getShoulderPosition().y,
                 this.player.id
             );
             this.bullets.push(bullet); // Dodaj pocisk do tablicy
@@ -402,8 +402,8 @@ export class Game {
             socket.emit('player_shoot', {
                 x: this.player.getHandPosition().x,
                 y: this.player.getHandPosition().y,
-                targetX: Math.round(this.mouseX),
-                targetY: Math.round(this.mouseY),
+                targetX: this.player.getShoulderPosition().x,
+                targetY: this.player.getShoulderPosition().y,
                 playerId: this.player.id
             });
             // Puść dźwięk pojedynczego strzału
@@ -416,8 +416,8 @@ export class Game {
                     const bullet = new Bullet(
                         this.player.getHandPosition().x,
                         this.player.getHandPosition().y,
-                        Math.round(this.mouseX),
-                        Math.round(this.mouseY),
+                        this.player.getShoulderPosition().x,
+                        this.player.getShoulderPosition().y,
                         this.player.id
                     );
     
@@ -426,8 +426,8 @@ export class Game {
                     socket.emit('player_shoot', {
                         x: this.player.getHandPosition().x,
                         y: this.player.getHandPosition().y,
-                        targetX: Math.round(this.mouseX),
-                        targetY: Math.round(this.mouseY),
+                        targetX: this.player.getShoulderPosition().x,
+                        targetY: this.player.getShoulderPosition().y,
                         playerId: this.player.id
                     });
 
@@ -477,18 +477,29 @@ export class Game {
     }
 
     drawBackground() {
-        this.ctx.fillStyle = '#5a6170';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        // Wyczyszczenie tła
+        this.backgroundCtx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
+        
+        // Rysowanie tylko widocznego fragmentu tła na podstawie pozycji kamery
+        this.backgroundCtx.drawImage(
+          this.backgroundImage,
+          0,                 // X na obrazie źródłowym, od którego zaczynamy rysowanie
+          0,                 // Y na obrazie źródłowym, od którego zaczynamy rysowanie
+        );
+
     }
 
     update() {
+        // Czyszczenie poprzedniej instacji gry
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
         // Bloku ruch gracza jeżeli jest martwy
         if (this.player.isAlive) {
             this.player.move(keysPressed);
             this.camera.update();
         }
         // this.drawCollisionMap()
-        this.drawBackground();
+        // this.drawBackground();
         this.drawGround();
         
         // Rysowanie gracza

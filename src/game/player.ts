@@ -104,15 +104,6 @@ export class Player {
     
         // Ustal hitboxy dla każdej części ciała w odpowiednich pozycjach
         this.initializeHitboxes();
-
-        // console.log("headHitbox:");
-        // console.log(this.headHitbox);
-
-        // console.log("torsoHitbox:");
-        // console.log(this.torsoHitbox);
-
-        // console.log("legHitbox:");
-        // console.log(this.legHitbox);
     }
 
     checkImagesLoaded(): void {
@@ -403,7 +394,7 @@ export class Player {
         ctx.restore();
         ctx.restore();
     }
-    
+
     drawDeathAnimation(ctx: CanvasRenderingContext2D) {
         if (!this.deathTime) return;  // Ensure deathTime is set
     
@@ -552,7 +543,13 @@ export class Player {
         );
     }
     
-    
+    getShoulderPosition(): { x: number; y: number } {
+        const flipLeft = this.mouseX < this.x + this.width / 2;
+        const shoulderX = flipLeft ? this.x + this.width - 5 : this.x + 5;
+        const shoulderY = this.y + 16;
+        return { x: shoulderX, y: shoulderY };
+    }
+
     getHandPosition() {
         return this.handEndXY;
     }

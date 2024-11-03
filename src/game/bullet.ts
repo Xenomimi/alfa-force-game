@@ -24,8 +24,8 @@ export class Bullet {
         this.trail = [];
     
         // Oblicz wektor kierunku
-        const dx = targetX - x;
-        const dy = targetY - y;
+        const dx = this.x - targetX;
+        const dy = this.y - targetY;
         const length = Math.sqrt(dx * dx + dy * dy);
     
         // Sprawdź, czy długość nie jest zerowa, aby uniknąć dzielenia przez zero
