@@ -461,11 +461,11 @@ export class Player {
 
     move(keysPressed: { [key: string]: boolean }) {
         // Ogranicz ruch gracza do granic ekranu
-        if (keysPressed['d'] && this.x + this.width < 1920) {
+        if (keysPressed['d']) {
             this.x += this.speed;
             this.animateLegs()
         }
-        if (keysPressed['a'] && this.x > 0) {
+        if (keysPressed['a']) {
             this.x -= this.speed;
             this.animateLegs()
         }
