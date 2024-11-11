@@ -1,3 +1,5 @@
+import CollisionChecker from './collisionChecker';
+
 export class Player {
     id: string;
     x: number;
@@ -8,7 +10,6 @@ export class Player {
     speed: number;
     gravity: number;
     verticalSpeed: number;
-    groundY: number;
     mouseX: number;
     mouseY: number;
     handEndXY: {x: number, y: number};
@@ -51,7 +52,6 @@ export class Player {
         this.speed = 2.5;
         this.gravity = 0.19;
         this.verticalSpeed = 0;
-        this.groundY = 600;
         this.mouseX = 0;
         this.mouseY = 0;
         this.handEndXY = {x: 0, y: 0};
@@ -215,23 +215,13 @@ export class Player {
         ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
         ctx.rotate(thighAngle); // Obrót uda (joint)
 
-        // Punkt obrotu biodra
-
         // Rysuj udo (joint)
         ctx.drawImage(this.joint, -this.joint.width / 2, -5);
-
-        // Rysowanie hitboxa uda
-        ctx.strokeStyle = 'rgb(0, 0, 255, 1)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-this.joint.width / 2, 0, this.joint.width, this.joint.height);
 
         // Przejdź do końca uda i rysuj podudzie (leg) z dodatkowym kątem dla zgięcia kolana
         ctx.translate(3, this.joint.height / 3);
         ctx.rotate(calfAngle); // Zgięcie w kolanie
         ctx.drawImage(this.leg, -this.leg.width / 2, 0);
-
-        // Rysowanie hitboxa podudzia
-        ctx.strokeRect(-this.leg.width / 2, 0, this.leg.width, this.leg.height);
 
         ctx.restore();
     }
@@ -450,29 +440,74 @@ export class Player {
         }
     }
 
-    move(keysPressed: { [key: string]: boolean }) {
-        // Ogranicz ruch gracza do granic ekranu
-        if (keysPressed['d']) {
-            this.x += this.speed;
-            this.animateLegs()
-        }
-        if (keysPressed['a']) {
-            this.x -= this.speed;
-            this.animateLegs()
+    move(keysPressed: { [key: string]: boolean }, collisionChecker: CollisionChecker) {
+        let newX = this.x;
+        let newY = this.y;
+
+        // Ruch poziomy
+        if (keysPressed['d']) newX += this.speed;
+        if (keysPressed['a']) newX -= this.speed;
+
+        // Sprawdzenie kolizji dla osi X (ruch w bok)
+        const horizontalPolygon = [
+            { x: newX, y: this.y },
+            { x: newX + this.width, y: this.y },
+            { x: newX + this.width, y: this.y + this.height },
+            { x: newX, y: this.y + this.height }
+        ];
+
+        if (!collisionChecker.checkPlayerCollision(horizontalPolygon)) {
+            this.x = newX; // Aktualizacja pozycji X tylko, jeśli brak kolizji
+        } else {
+            // Gradualne sprawdzanie nachylenia, aby umożliwić płynne wspinanie
+            const maxStepUpHeight = 10; // Maksymalna wysokość, na jaką gracz może wejść przy jednym kroku
+            let stepUpSuccessful = false;
+
+            for (let i = 1; i <= maxStepUpHeight; i++) {
+                const slopePolygon = [
+                    { x: newX, y: this.y - i },
+                    { x: newX + this.width, y: this.y - i },
+                    { x: newX + this.width, y: this.y + this.height - i },
+                    { x: newX, y: this.y + this.height - i }
+                ];
+
+                if (!collisionChecker.checkPlayerCollision(slopePolygon)) {
+                    // Pozwól graczowi "wejść" na obiekt na obliczoną wysokość nachylenia
+                    this.x = newX;
+                    this.y -= i;
+                    stepUpSuccessful = true;
+                    break;
+                }
+            }
+
+            // Jeśli nie udało się wejść pod górkę, gracz pozostaje na oryginalnej pozycji
+            if (!stepUpSuccessful) {
+                this.x = this.x;
+            }
         }
 
-        // Dodaj grawitację
-        this.verticalSpeed += this.gravity; // Przyspieszenie grawitacyjne
-        this.y += this.verticalSpeed; // Aktualizuj położenie gracza w osi Y
+        // Dodanie grawitacji do osi Y
+        this.verticalSpeed += this.gravity;
+        newY += this.verticalSpeed;
 
-        // Sprawdź kolizję z ziemią
-        if (this.y + this.height > this.groundY) {
-            this.y = this.groundY - this.height; // Zatrzymaj gracza na ziemi
-            this.verticalSpeed = 0; // Resetuj prędkość pionową
+        // Sprawdzenie kolizji dla osi Y (spadanie)
+        const verticalPolygon = [
+            { x: this.x, y: newY },
+            { x: this.x + this.width, y: newY },
+            { x: this.x + this.width, y: newY + this.height },
+            { x: this.x, y: newY + this.height }
+        ];
+
+        if (!collisionChecker.checkPlayerCollision(verticalPolygon)) {
+            this.y = newY; // Aktualizacja pozycji Y tylko, jeśli brak kolizji
+        } else {
+            // Resetowanie ruchu pionowego przy kolizji
+            this.verticalSpeed = 0;
         }
 
         this.updateHitboxes();
     }
+
 
     takeDamage(damage: number): boolean {
         this.health = Math.max(0, this.health - damage);
@@ -501,10 +536,10 @@ export class Player {
     }
 
     jump() {
-        // Umożliw skok, tylko jeśli gracz jest na ziemi
-        if (this.y + this.height >= this.groundY) {
-            this.verticalSpeed = -10; // Ustaw prędkość skoku (ujemna)
-        }
+        // if (this.verticalSpeed === 0) {
+        //     this.verticalSpeed = -10; // Ustaw prędkość skoku
+        // }
+        this.verticalSpeed = -10;
     }
 
     drawHealthBar(ctx: CanvasRenderingContext2D) {

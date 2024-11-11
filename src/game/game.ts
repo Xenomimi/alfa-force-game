@@ -2,10 +2,17 @@ import { io } from "socket.io-client";
 import { Player } from "./player";
 import { Bullet } from "./bullet";
 import { Camera } from "./camera";
+import CollisionChecker from "./collisionChecker"
+import mapData from "../assets/map_data.json";
+
+
 
 const socket = io('http://localhost:3000');
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};  // Przechowuj pozostałych graczy
+const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1")!;
+const collisionObjects = collisionLayer.objects!;
+const collisionChecker = new CollisionChecker(collisionObjects, 3);
 
 export class Game {
     canvas: HTMLCanvasElement;
@@ -16,12 +23,11 @@ export class Game {
     backgroundCtx: CanvasRenderingContext2D;
     backgroundImage: HTMLImageElement;
     collisionImage: HTMLImageElement;
-    camera: Camera;
-    cameraX: number;
-    cameraY: number;
+    // camera: Camera;
+    // cameraX: number;
+    // cameraY: number;
     player: Player;
     prevPlayerPosition: { x: number, y: number, mouseX: number, mouseY: number };
-    prevMousePosition: { x: number, y: number };
     mouseX: number;
     mouseY: number;
     bullets: Bullet[];
@@ -50,14 +56,13 @@ export class Game {
             mouseY: this.player.mouseY
         };
         // Camera init
-        this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
-        this.camera.follow(this.player);
-        this.cameraX = 0;
-        this.cameraY = 0;
+        // this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
+        // this.camera.follow(this.player);
+        // this.cameraX = this.player.x;
+        // this.cameraY = this.player.y;
         // Mouse position
         this.mouseX = 0;
         this.mouseY = 0;
-        this.prevMousePosition = { x: this.mouseX, y: this.mouseY };
         // Bullets in game
         this.bullets = [];
         // Gun sounds
@@ -201,7 +206,7 @@ export class Game {
             // Usuń odpowiedni pocisk, jeśli istnieje
             this.bullets = this.bullets.filter(bullet => 
                 !(bullet.playerId === data.playerId && 
-                  bullet.isOffscreen(this.canvas.width, this.canvas.height))
+                  bullet.isOffscreen(this.backgroundCanvas.width, this.backgroundCanvas.height))
             );
         });
 
@@ -222,6 +227,10 @@ export class Game {
             if (event.key === 'w') {
                 this.player.jump();
             }
+            if (event.key === 't') {
+                const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1");
+                console.log(collisionLayer?.objects);
+            }
         });
 
         document.addEventListener('keyup', (event) => {
@@ -232,18 +241,19 @@ export class Game {
         });
 
         document.addEventListener('mousemove', (event) => {
-            const rect = this.canvas.getBoundingClientRect();
-            
-            this.mouseX = event.clientX - rect.left;
-            this.mouseY = event.clientY - rect.top;
+            const rect = this.backgroundCanvas.getBoundingClientRect();
 
-            const scaleX = this.canvas.width / rect.width;
-            const scaleY = this.canvas.height / rect.height;
+            console.log(rect.width, this.backgroundCanvas.width);
             
-            this.mouseX *= scaleX;
-            this.mouseY *= scaleY;
-
-            // Aktualizuj tylko pozycję ręki aktualnego gracza
+            // Skalowanie w osi X i Y
+            const scaleX = this.backgroundCanvas.width / rect.width;
+            const scaleY = this.backgroundCanvas.height / rect.height;
+        
+            // Przeskalowanie współrzędnych myszy względem canvasu
+            this.mouseX = (event.clientX - rect.left) * scaleX;
+            this.mouseY = (event.clientY - rect.top) * scaleY;
+        
+            // Aktualizuj pozycję ręki gracza
             this.player.mouseX = this.mouseX;
             this.player.mouseY = this.mouseY;
         });
@@ -284,51 +294,53 @@ export class Game {
     }
 
     start() {
-        this.update();
+        // Wait until player's images are loaded
+        const waitForImages = () => {
+            if (this.player.imagesLoaded) {
+                this.update();
+            } else {
+                requestAnimationFrame(waitForImages);
+            }
+        };
+        waitForImages();
     }
 
-    // drawCollisionMap() {
-    //     this.collisionCtx.clearRect(0, 0, this.collisionCanvas.width, this.collisionCanvas.height);
-    //     this.collisionCtx.drawImage(
-    //       this.collisionImage,
-    //       -this.cameraX, -this.cameraY,
-    //       this.collisionCanvas.width,
-    //       this.collisionCanvas.height
-    //     );
-    //   }
+    drawCollisionMap(ctx: CanvasRenderingContext2D) {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        const scaleFactor = 3;
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        
 
-    //   drawBackground() {
-    //     // Wyczyszczenie tła
-    //     this.backgroundCtx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
-      
-    //     // Rysowanie tylko widocznego fragmentu tła na podstawie pozycji kamery
-    //     this.backgroundCtx.drawImage(
-    //       this.backgroundImage,
-    //       this.cameraX,                 // X na obrazie źródłowym, od którego zaczynamy rysowanie
-    //       this.cameraY,                 // Y na obrazie źródłowym, od którego zaczynamy rysowanie
-    //       this.backgroundCanvas.width,  // Szerokość wycinka obrazu tła (widocznego obszaru)
-    //       this.backgroundCanvas.height, // Wysokość wycinka obrazu tła (widocznego obszaru)
-    //       0,                            // X na płótnie docelowym, gdzie zaczyna się rysowanie (lewy górny róg)
-    //       0,                            // Y na płótnie docelowym, gdzie zaczyna się rysowanie (lewy górny róg)
-    //       this.backgroundCanvas.width,  // Szerokość, na jaką ma zostać rozciągnięty wycinek na płótnie docelowym
-    //       this.backgroundCanvas.height  // Wysokość, na jaką ma zostać rozciągnięty wycinek na płótnie docelowym
-    //     );
-    //   }
 
-    drawGround() {
-        this.ctx.fillStyle = '#182224';
-        this.ctx.fillRect(0, 600, this.canvas.width, 50);
-    }
-
-    checkMapCollision(playerX: number, playerY: number): boolean {
-        this.collisionCanvas.width = this.collisionImage.width;
-        this.collisionCanvas.height = this.collisionImage.height;
+        collisionObjects?.forEach((obj: any) => {
+            if (obj.polygon) {
+                // Rysowanie wielokąta ze skalowaniem
+                ctx.beginPath();
+                const startX = (obj.x + obj.polygon[0].x) * scaleFactor;
+                const startY = (obj.y + obj.polygon[0].y) * scaleFactor;
+                ctx.moveTo(startX, startY);
     
-        this.collisionCtx.drawImage(this.collisionImage, 0, 0);
-        const pixelData = this.collisionCtx.getImageData(playerX, playerY, 1, 1).data;
-    
-        // Sprawdzamy, czy piksel nie jest przezroczysty (np. ma niezerową wartość alfa)
-        return pixelData[3] !== 0;
+                obj.polygon.slice(1).forEach((point: any) => {
+                    const x = (obj.x + point.x) * scaleFactor;
+                    const y = (obj.y + point.y) * scaleFactor;
+                    ctx.lineTo(x, y);
+                });
+
+                ctx.closePath();
+                ctx.stroke();
+            } else {
+                // Rysowanie prostokąta ze skalowaniem
+                ctx.strokeRect(
+                    obj.x * scaleFactor,
+                    obj.y * scaleFactor,
+                    obj.width * scaleFactor,
+                    obj.height * scaleFactor
+                );
+            }
+        });
     }
 
     // Zaktualizuj pociski
@@ -356,7 +368,7 @@ export class Game {
                     break;
                 }
             }
-            if (bullet.isOffscreen(this.canvas.width, this.canvas.height)) {
+            if (bullet.isOffscreen(this.backgroundCanvas.width, this.backgroundCanvas.height)) {
                 this.bullets.splice(i, 1);
             }
         }
@@ -476,49 +488,87 @@ export class Game {
         }, 5000);
     }
 
-    drawBackground() {
+    drawContextLines() {
+        const contextColors = [
+            { ctx: this.backgroundCtx, color: "blue" },
+            // { ctx: this.collisionCtx, color: "green" },
+            { ctx: this.ctx, color: "red" }
+        ];
+
+        this.ctx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
+    
+        contextColors.forEach(({ ctx, color }) => {
+            ctx.strokeStyle = color; // Ustawienie koloru obramowania dla kontekstu
+            ctx.lineWidth = 5; // Grubość linii obramowania
+            ctx.strokeRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Rysowanie obramowania wzdłuż krawędzi płótna
+        });
+    }
+
+    drawBackground(ctx: CanvasRenderingContext2D) {
         // Wyczyszczenie tła
-        this.backgroundCtx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
+        ctx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
         
         // Rysowanie tylko widocznego fragmentu tła na podstawie pozycji kamery
-        this.backgroundCtx.drawImage(
-          this.backgroundImage,
-          0,                 // X na obrazie źródłowym, od którego zaczynamy rysowanie
-          0,                 // Y na obrazie źródłowym, od którego zaczynamy rysowanie
-        );
-
+        ctx.drawImage(
+            this.backgroundImage,
+            0,
+            0,
+            ctx.canvas.width,
+            ctx.canvas.height
+        )
+        // this.ctx.drawImage(
+        //     this.backgroundImage,
+        //     this.camera.xView,                 // X na obrazie źródłowym (pozycja kamery)
+        //     this.camera.yView,                 // Y na obrazie źródłowym (pozycja kamery)
+        //     this.camera.viewportWidth,         // Szerokość wycinka obrazu
+        //     this.camera.viewportHeight,        // Wysokość wycinka obrazu
+        //     0,                                 // X na płótnie docelowym
+        //     0,                                 // Y na płótnie docelowym
+        //     this.backgroundCanvas.width,       // Szerokość rysowanego obrazu
+        //     this.backgroundCanvas.height       // Wysokość rysowanego obrazu
+        // );
     }
 
     update() {
         // Czyszczenie poprzedniej instacji gry
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Bloku ruch gracza jeżeli jest martwy
+        this.drawBackground(this.backgroundCtx);
+
+        this.drawCollisionMap(this.collisionCtx);
+
+
+        this.drawContextLines();
+        //Bloku ruch gracza jeżeli jest martwy
         if (this.player.isAlive) {
-            this.player.move(keysPressed);
-            this.camera.update();
+            this.player.move(keysPressed, collisionChecker);
+            // this.camera.follow(this.player);
+            // this.camera.update();
         }
-        // this.drawCollisionMap()
-        // this.drawBackground();
-        this.drawGround();
-        
         // Rysowanie gracza
-        this.player.draw(this.ctx);
+        this.player.draw(this.backgroundCtx);
 
         for (let id in otherPlayers) {
-            otherPlayers[id].draw(this.ctx);
+            otherPlayers[id].draw(this.backgroundCtx);
         }
 
         // Aktualizacja pocisków
         this.updateBullets();
         for (const bullet of this.bullets) {
-            bullet.draw(this.ctx);
+            bullet.draw(this.backgroundCtx);
         }
 
         if (!this.player.isAlive) {
-            this.player.drawDeathAnimation(this.ctx);
-            this.player.drawDeathScreen(this.ctx);
+            this.player.drawDeathAnimation(this.backgroundCtx);
+            this.player.drawDeathScreen(this.backgroundCtx);
         }
+
+        // Pozycja kursora
+        this.backgroundCtx.beginPath();
+        this.backgroundCtx.arc(this.mouseX, this.mouseY, 5, 0, Math.PI * 2);
+        this.backgroundCtx.fillStyle = 'red';
+        this.backgroundCtx.fill();
+        this.backgroundCtx.closePath();
 
         this.checkAndEmitPosition();
         requestAnimationFrame(() => this.update());

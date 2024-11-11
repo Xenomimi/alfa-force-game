@@ -28,15 +28,25 @@ export class Camera {
 
     update() {
         if (this.followed) {
+            // Oblicz pozycję kamery względem gracza
             this.xView = this.followed.x - this.xDeadZone;
             this.yView = this.followed.y - this.yDeadZone;
-
-            // Boundaries to keep the camera within the world limits
-            this.xView = Math.max(0, Math.min(this.xView, this.worldWidth - this.viewportWidth));
-            this.yView = Math.max(0, Math.min(this.yView, this.worldHeight - this.viewportHeight));
-
-
-            console.log(this.xView, this.yView)
+    
+            // Ograniczenia kamery, aby nie wychodziła poza granice tła
+            
+            // Ograniczenie po lewej i prawej stronie
+            if (this.xView < 0) {
+                this.xView = 0;
+            } else if (this.xView > this.worldWidth - this.viewportWidth) {
+                this.xView = this.worldWidth - this.viewportWidth;
+            }
+            
+            // Ograniczenie po górze i dole
+            if (this.yView < 0) {
+                this.yView = 0;
+            } else if (this.yView > this.worldHeight - this.viewportHeight) {
+                this.yView = this.worldHeight - this.viewportHeight;
+            }
         }
     }
 }

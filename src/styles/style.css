@@ -19,7 +19,7 @@ html, body {
 }
 
 canvas {
-  aspect-ratio: 1600 / 1048;
+  /* aspect-ratio: 1600 / 1048; */
   width: 100%;
   height: auto;
   object-fit: contain;

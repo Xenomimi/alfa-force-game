@@ -9,7 +9,8 @@ const App: React.FC = () => {
     const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 
     const updateCanvasSize = () => {
-      const aspectRatio = 1600 / 1048;
+      // const aspectRatio = 1600 / 1048;
+      const aspectRatio = 3360 / 2538;
       let canvasWidth = window.innerWidth;
       let canvasHeight = window.innerHeight;
 
@@ -32,10 +33,10 @@ const App: React.FC = () => {
       gameCanvas.height = 1048;
 
       // Większa rozdzielczość wewnętrzna tła i kolizji (rozmiar mapy)
-      backgroundCanvas.width = 4800; // Podwójna szerokość
-      backgroundCanvas.height = 3144; // Podwójna wysokość
-      collisionCanvas.width = 4800;
-      collisionCanvas.height = 3144;
+      backgroundCanvas.width = 3360; // Podwójna szerokość
+      backgroundCanvas.height = 2538; // Podwójna wysokość
+      collisionCanvas.width = 3360;
+      collisionCanvas.height = 2538;
     };
 
     updateCanvasSize();
@@ -51,9 +52,9 @@ const App: React.FC = () => {
 
   return (
     <div id="container">
+      <canvas id="gameCanvas"></canvas>
       <canvas id="backgroundCanvas"></canvas>
       <canvas id="collisionCanvas"></canvas>
-      <canvas id="gameCanvas"></canvas>
     </div>
   );
 };
