@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 import { Player } from "./player";
 import { Bullet } from "./bullet";
-import { Camera } from "./camera";
+// import { Camera } from "./camera";
 import CollisionChecker from "./collisionChecker"
 import mapData from "../assets/map_data.json";
 

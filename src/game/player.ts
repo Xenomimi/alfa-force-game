@@ -445,8 +445,15 @@ export class Player {
         let newY = this.y;
 
         // Ruch poziomy
-        if (keysPressed['d']) newX += this.speed;
-        if (keysPressed['a']) newX -= this.speed;
+        if (keysPressed['d']) {
+            newX += this.speed;
+            this.animateLegs()
+        }
+
+        if (keysPressed['a']) { 
+            newX -= this.speed;
+            this.animateLegs();
+        }
 
         // Sprawdzenie kolizji dla osi X (ruch w bok)
         const horizontalPolygon = [
