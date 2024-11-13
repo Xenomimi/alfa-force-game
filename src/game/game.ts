@@ -22,7 +22,7 @@ export class Game {
     collisionCtx: CanvasRenderingContext2D;
     backgroundCtx: CanvasRenderingContext2D;
     backgroundImage: HTMLImageElement;
-    collisionImage: HTMLImageElement;
+    foregroundImage: HTMLImageElement;
     camera: Camera;
     cameraX: number;
     cameraY: number;
@@ -45,8 +45,8 @@ export class Game {
         // Map images init
         this.backgroundImage = new Image();
         this.backgroundImage.src = "./map.jpg";
-        this.collisionImage = new Image();
-        this.collisionImage.src = "./11a.png";
+        this.foregroundImage = new Image();
+        this.foregroundImage.src = "./foreground.png";
         // Camera init
         this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
         // Player init
@@ -506,10 +506,6 @@ export class Game {
     }
 
     drawBackground(ctx: CanvasRenderingContext2D) {
-        // Wyczyszczenie tła
-        ctx.clearRect(0, 0, this.backgroundCanvas.width, this.backgroundCanvas.height);
-        
-        // Rysowanie tylko widocznego fragmentu tła na podstawie pozycji kamery
         ctx.drawImage(
             this.backgroundImage,
             0,
@@ -519,20 +515,27 @@ export class Game {
         )
     }
 
+    drawForeground(ctx: CanvasRenderingContext2D) {
+        ctx.drawImage(
+            this.foregroundImage,
+            0,
+            0,
+            ctx.canvas.width,
+            ctx.canvas.height
+        )
+    }
+
     renderGame() {
         // Czyszczenie poprzedniej instacji gry
+        
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.drawBackground(this.backgroundCtx);
-
-        this.drawCollisionMap(this.collisionCtx);
-
         // this.drawContextLines();
-
+        this.drawBackground(this.backgroundCtx);
         //Bloku ruch gracza jeżeli jest martwy
         if (this.player.isAlive) {
             this.player.move(keysPressed, collisionChecker);
-            this.camera.update();
+            this.camera.update({x: this.mouseX, y: this.mouseY});
         }
         // Rysowanie gracza
         this.player.draw(this.backgroundCtx);
@@ -551,6 +554,8 @@ export class Game {
             this.player.drawDeathAnimation(this.backgroundCtx);
             this.player.drawDeathScreen(this.backgroundCtx);
         }
+
+        // this.drawForeground(this.backgroundCtx);
     }
 
     renderCameraView() {

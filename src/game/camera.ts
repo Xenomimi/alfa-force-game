@@ -26,22 +26,27 @@ export class Camera {
         this.followed = player;
     }
 
-    update() {
+    lerp(start: number, end: number, t: number): number {
+        return start + (end - start) * t;
+    }
+
+    update(mousePosition: { x: number, y: number }, lerpFactor: number = 0.05) {
         if (this.followed) {
-            // Oblicz pozycję kamery względem gracza
-            this.xView = this.followed.x - this.xDeadZone;
-            this.yView = this.followed.y - this.yDeadZone;
-    
-            // Ograniczenia kamery, aby nie wychodziła poza granice tła
-            
-            // Ograniczenie po lewej i prawej stronie
+            // Cel kamery pomiędzy pozycją gracza a pozycją myszy
+            const targetX = this.followed.x - this.xDeadZone + (mousePosition.x - (this.followed.x - this.xDeadZone)) * 0.3;
+            const targetY = this.followed.y - this.yDeadZone + (mousePosition.y - (this.followed.y - this.yDeadZone)) * 0.3;
+
+            // Aktualizacja pozycji kamery przy użyciu interpolacji
+            this.xView = this.lerp(this.xView, targetX, lerpFactor);
+            this.yView = this.lerp(this.yView, targetY, lerpFactor);
+
+            // Ograniczenia kamery
             if (this.xView < 0) {
                 this.xView = 0;
             } else if (this.xView > this.worldWidth - this.viewportWidth) {
                 this.xView = this.worldWidth - this.viewportWidth;
             }
-            
-            // Ograniczenie po górze i dole
+
             if (this.yView < 0) {
                 this.yView = 0;
             } else if (this.yView > this.worldHeight - this.viewportHeight) {

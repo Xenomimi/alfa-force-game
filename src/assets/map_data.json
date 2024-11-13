@@ -4,7 +4,7 @@
  "layers":[
         {
          "id":3,
-         "image":"..\/tdp-images\/hangar\/symbols\/map.jpg",
+         "image":"..\/..\/..\/..\/tdp-images\/hangar\/symbols\/map.jpg",
          "name":"Warstwa Obrazka 1",
          "opacity":1,
          "type":"imagelayer",
@@ -23,8 +23,12 @@
                  "name":"",
                  "polygon":[
                         {
-                         "x":0,
-                         "y":0
+                         "x":-34,
+                         "y":-3
+                        }, 
+                        {
+                         "x":-577,
+                         "y":49
                         }, 
                         {
                          "x":-590,
@@ -37,6 +41,10 @@
                         {
                          "x":0,
                          "y":8
+                        }, 
+                        {
+                         "x":0,
+                         "y":-1
                         }],
                  "rotation":0,
                  "type":"",
@@ -63,7 +71,7 @@
                  "rotation":0,
                  "type":"",
                  "visible":true,
-                 "width":94,
+                 "width":80,
                  "x":0,
                  "y":0
                 }, 
@@ -129,20 +137,54 @@
                  "y":830
                 }, 
                 {
-                 "height":30,
+                 "height":45,
                  "id":44,
                  "name":"",
+                 "polygon":[
+                        {
+                         "x":-2,
+                         "y":0
+                        }, 
+                        {
+                         "x":124,
+                         "y":0
+                        }, 
+                        {
+                         "x":124,
+                         "y":45
+                        }, 
+                        {
+                         "x":4,
+                         "y":44
+                        }],
                  "rotation":0,
                  "type":"",
                  "visible":true,
-                 "width":139,
-                 "x":719,
-                 "y":730
+                 "width":124,
+                 "x":716,
+                 "y":715
                 }, 
                 {
                  "height":30,
                  "id":45,
                  "name":"",
+                 "polygon":[
+                        {
+                         "x":16,
+                         "y":-16
+                        }, 
+                        {
+                         "x":145,
+                         "y":-16
+                        }, 
+                        {
+                         "x":139,
+                         "y":30
+                        }, 
+                        {
+                         "x":16,
+                         "y":30
+                        }],
                  "rotation":0,
                  "type":"",
                  "visible":true,
@@ -188,11 +230,11 @@
                          "y":0
                         }, 
                         {
-                         "x":-92,
+                         "x":-106,
                          "y":0
                         }, 
                         {
-                         "x":-92,
+                         "x":-106,
                          "y":16
                         }, 
                         {
@@ -216,11 +258,11 @@
                          "y":0
                         }, 
                         {
-                         "x":-70,
+                         "x":-84,
                          "y":0
                         }, 
                         {
-                         "x":-70,
+                         "x":-84,
                          "y":29
                         }, 
                         {
@@ -245,8 +287,8 @@
                  "rotation":0,
                  "type":"",
                  "visible":true,
-                 "width":75,
-                 "x":94,
+                 "width":89,
+                 "x":80,
                  "y":621
                 }, 
                 {
@@ -259,6 +301,38 @@
                  "width":110,
                  "x":930,
                  "y":247
+                }, 
+                {
+                 "height":21,
+                 "id":57,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":114,
+                         "y":-3
+                        }, 
+                        {
+                         "x":114,
+                         "y":23
+                        }, 
+                        {
+                         "x":-27,
+                         "y":23
+                        }, 
+                        {
+                         "x":-27,
+                         "y":10
+                        }, 
+                        {
+                         "x":-8,
+                         "y":-3
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":46.0759493670886,
+                 "x":926,
+                 "y":427
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -267,7 +341,7 @@
          "y":0
         }],
  "nextlayerid":5,
- "nextobjectid":54,
+ "nextobjectid":65,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.11.0",

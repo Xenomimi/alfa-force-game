@@ -195,14 +195,14 @@ export class Player {
     
         // Rysuj tors i głowę
         ctx.drawImage(this.torso, this.torsoHitbox.x, this.torsoHitbox.y);
-        ctx.strokeStyle = 'blue';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torsoHitbox.width, this.torsoHitbox.height);
+        // ctx.strokeStyle = 'blue';
+        // ctx.lineWidth = 1;
+        // ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torsoHitbox.width, this.torsoHitbox.height);
         
         ctx.drawImage(this.head, this.headHitbox.x, this.headHitbox.y);
-        ctx.strokeStyle = 'blue';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
+        // ctx.strokeStyle = 'blue';
+        // ctx.lineWidth = 1;
+        // ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
     
         // Rysuj rękę z bronią
         this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft, this.camera);
