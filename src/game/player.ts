@@ -1,3 +1,4 @@
+import { Camera } from './camera';
 import CollisionChecker from './collisionChecker';
 
 export class Player {
@@ -12,6 +13,7 @@ export class Player {
     verticalSpeed: number;
     mouseX: number;
     mouseY: number;
+    camera: Camera;
     handEndXY: {x: number, y: number};
     gun_model: HTMLImageElement;
     gun_loaded?: boolean;
@@ -44,16 +46,17 @@ export class Player {
 
     imagesLoaded: boolean = false;
 
-    constructor(id: string, x: number, y: number) {
+    constructor(id: string, x: number, y: number, camera: Camera) {
         this.id = id;
         this.x = x;
         this.y = y;
         this.color = 'rgb(255, 0, 0, 0.5)';
-        this.speed = 2.5;
+        this.speed = 4;
         this.gravity = 0.19;
         this.verticalSpeed = 0;
         this.mouseX = 0;
         this.mouseY = 0;
+        this.camera = camera;
         this.handEndXY = {x: 0, y: 0};
         this.maxHealth = 100;
         this.health = this.maxHealth;
@@ -172,7 +175,7 @@ export class Player {
         if (!this.isAlive) return;
     
         // Określ, czy obrócić postać w lewo
-        const flipLeft = this.mouseX < this.x + this.width / 2;
+        const flipLeft = this.mouseX + this.camera.xView < this.x + this.width / 2;
     
 
         ctx.save();
@@ -202,7 +205,7 @@ export class Player {
         ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
     
         // Rysuj rękę z bronią
-        this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft);
+        this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft, this.camera);
         // Rysuj pasek zdrowia wycentrowany
         this.drawHealthBar(ctx);
     
@@ -242,7 +245,10 @@ export class Player {
         }
     }
 
-    drawHand(ctx: CanvasRenderingContext2D, mouseX: number, mouseY: number, isFlipped: boolean) {
+    drawHand(ctx: CanvasRenderingContext2D, rawMouseX: number, rawMouseY: number, isFlipped: boolean, camera: Camera) {
+        const adjustedMouseX = rawMouseX + camera.xView;
+        const adjustedMouseY = rawMouseY + camera.yView;
+        
         const upperArmLength = 15;
         const forearmLength = 15;
         let shoulderX;
@@ -254,8 +260,8 @@ export class Player {
 
         const shoulderY = this.y + 16;
     
-        let dirX = mouseX - shoulderX;
-        let dirY = mouseY - shoulderY;
+        let dirX = adjustedMouseX - shoulderX;
+        let dirY = adjustedMouseY - shoulderY;
     
         const length = Math.sqrt(dirX * dirX + dirY * dirY);
         if (length > 0) {
@@ -542,11 +548,26 @@ export class Player {
         this.verticalSpeed = 0;
     }
 
-    jump() {
-        // if (this.verticalSpeed === 0) {
-        //     this.verticalSpeed = -10; // Ustaw prędkość skoku
-        // }
-        this.verticalSpeed = -10;
+    jump(collisionChecker: CollisionChecker) {
+        if (this.isOnGround(collisionChecker)) {
+            this.verticalSpeed = -13; // Ustaw prędkość skoku
+        }
+    }
+
+    isOnGround(collisionChecker: CollisionChecker): boolean {
+        // Przesunięcie w dół o małą wartość, aby sprawdzić, czy poniżej gracza znajduje się podłoże
+        const offset = 1;
+    
+        // Tworzymy hitbox tuż pod graczem, aby sprawdzić, czy dotyka ziemi
+        const groundCheckPolygon = [
+            { x: this.x, y: this.y + this.height + offset },
+            { x: this.x + this.width, y: this.y + this.height + offset },
+            { x: this.x + this.width, y: this.y + this.height + offset + 1 },
+            { x: this.x, y: this.y + this.height + offset + 1 }
+        ];
+    
+        // Sprawdzamy kolizję poniżej gracza za pomocą CollisionChecker
+        return collisionChecker.checkPlayerCollision(groundCheckPolygon);
     }
 
     drawHealthBar(ctx: CanvasRenderingContext2D) {

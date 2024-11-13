@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 import { Player } from "./player";
 import { Bullet } from "./bullet";
-// import { Camera } from "./camera";
+import { Camera } from "./camera";
 import CollisionChecker from "./collisionChecker"
 import mapData from "../assets/map_data.json";
 
@@ -23,9 +23,9 @@ export class Game {
     backgroundCtx: CanvasRenderingContext2D;
     backgroundImage: HTMLImageElement;
     collisionImage: HTMLImageElement;
-    // camera: Camera;
-    // cameraX: number;
-    // cameraY: number;
+    camera: Camera;
+    cameraX: number;
+    cameraY: number;
     player: Player;
     prevPlayerPosition: { x: number, y: number, mouseX: number, mouseY: number };
     mouseX: number;
@@ -47,19 +47,20 @@ export class Game {
         this.backgroundImage.src = "./map.jpg";
         this.collisionImage = new Image();
         this.collisionImage.src = "./11a.png";
+        // Camera init
+        this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
         // Player init
-        this.player = new Player(socket.id as string, 850, 300);
+        this.player = new Player(socket.id as string, 850, 300, this.camera);
         this.prevPlayerPosition = { 
             x: this.player.x, 
             y: this.player.y, 
             mouseX: this.player.mouseX, 
             mouseY: this.player.mouseY
         };
-        // Camera init
-        // this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
-        // this.camera.follow(this.player);
-        // this.cameraX = this.player.x;
-        // this.cameraY = this.player.y;
+        // Camera setup
+        this.camera.follow(this.player);
+        this.cameraX = this.player.x;
+        this.cameraY = this.player.y;
         // Mouse position
         this.mouseX = 0;
         this.mouseY = 0;
@@ -125,7 +126,7 @@ export class Game {
         socket.on('current_players', (players) => {
             for (let id in players) {
                 if (id === socket.id) {
-                    this.player = new Player(id, players[id].x, players[id].y);
+                    this.player = new Player(id, players[id].x, players[id].y, this.camera);
                     this.player.mouseX = players[id].handX;
                     this.player.mouseY = players[id].handY;
                     this.player.legSwingDirection = players[id].legSwingDirection;
@@ -135,7 +136,7 @@ export class Game {
                     this.player.torsoHitbox = players[id].torsoHitbox;
                     this.player.legHitbox = players[id].legHitbox;
                 } else {
-                    otherPlayers[id] = new Player(id, players[id].x, players[id].y);
+                    otherPlayers[id] = new Player(id, players[id].x, players[id].y, this.camera);
                     otherPlayers[id].mouseX = players[id].handX;
                     otherPlayers[id].mouseY = players[id].handY;
                     otherPlayers[id].legSwingDirection = players[id].legSwingDirection;
@@ -150,7 +151,7 @@ export class Game {
 
         socket.on('new_player', (data: { id: string, x: number, y: number, handX: number, handY: number }) => {
             if (data.id !== socket.id) {
-                otherPlayers[data.id] = new Player(data.id, data.x, data.y);
+                otherPlayers[data.id] = new Player(data.id, data.x, data.y, this.camera);
             }
         });
 
@@ -225,7 +226,7 @@ export class Game {
             keysPressed[event.key] = true;
 
             if (event.key === 'w') {
-                this.player.jump();
+                this.player.jump(collisionChecker);
             }
             if (event.key === 't') {
                 const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1");
@@ -241,13 +242,11 @@ export class Game {
         });
 
         document.addEventListener('mousemove', (event) => {
-            const rect = this.backgroundCanvas.getBoundingClientRect();
-
-            console.log(rect.width, this.backgroundCanvas.width);
+            const rect = this.canvas.getBoundingClientRect();
             
             // Skalowanie w osi X i Y
-            const scaleX = this.backgroundCanvas.width / rect.width;
-            const scaleY = this.backgroundCanvas.height / rect.height;
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
         
             // Przeskalowanie współrzędnych myszy względem canvasu
             this.mouseX = (event.clientX - rect.left) * scaleX;
@@ -256,6 +255,8 @@ export class Game {
             // Aktualizuj pozycję ręki gracza
             this.player.mouseX = this.mouseX;
             this.player.mouseY = this.mouseY;
+
+
         });
 
         // Logika strzelania
@@ -491,7 +492,7 @@ export class Game {
     drawContextLines() {
         const contextColors = [
             { ctx: this.backgroundCtx, color: "blue" },
-            // { ctx: this.collisionCtx, color: "green" },
+            { ctx: this.collisionCtx, color: "green" },
             { ctx: this.ctx, color: "red" }
         ];
 
@@ -516,20 +517,9 @@ export class Game {
             ctx.canvas.width,
             ctx.canvas.height
         )
-        // this.ctx.drawImage(
-        //     this.backgroundImage,
-        //     this.camera.xView,                 // X na obrazie źródłowym (pozycja kamery)
-        //     this.camera.yView,                 // Y na obrazie źródłowym (pozycja kamery)
-        //     this.camera.viewportWidth,         // Szerokość wycinka obrazu
-        //     this.camera.viewportHeight,        // Wysokość wycinka obrazu
-        //     0,                                 // X na płótnie docelowym
-        //     0,                                 // Y na płótnie docelowym
-        //     this.backgroundCanvas.width,       // Szerokość rysowanego obrazu
-        //     this.backgroundCanvas.height       // Wysokość rysowanego obrazu
-        // );
     }
 
-    update() {
+    renderGame() {
         // Czyszczenie poprzedniej instacji gry
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -537,13 +527,12 @@ export class Game {
 
         this.drawCollisionMap(this.collisionCtx);
 
+        // this.drawContextLines();
 
-        this.drawContextLines();
         //Bloku ruch gracza jeżeli jest martwy
         if (this.player.isAlive) {
             this.player.move(keysPressed, collisionChecker);
-            // this.camera.follow(this.player);
-            // this.camera.update();
+            this.camera.update();
         }
         // Rysowanie gracza
         this.player.draw(this.backgroundCtx);
@@ -562,13 +551,37 @@ export class Game {
             this.player.drawDeathAnimation(this.backgroundCtx);
             this.player.drawDeathScreen(this.backgroundCtx);
         }
+    }
+
+    renderCameraView() {
+        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+
+        this.ctx.drawImage(
+            this.backgroundCanvas,
+            this.camera.xView,
+            this.camera.yView,
+            1600,
+            1048,
+            0,
+            0,
+            this.ctx.canvas.width,
+            this.ctx.canvas.height
+        )
+    }
+
+    update() {
+
+        this.renderGame();
+        this.renderCameraView();
 
         // Pozycja kursora
-        this.backgroundCtx.beginPath();
-        this.backgroundCtx.arc(this.mouseX, this.mouseY, 5, 0, Math.PI * 2);
-        this.backgroundCtx.fillStyle = 'red';
-        this.backgroundCtx.fill();
-        this.backgroundCtx.closePath();
+        this.ctx.beginPath();
+        this.ctx.arc(this.player.mouseX, this.player.mouseY, 5, 0, Math.PI * 2);
+        this.ctx.fillStyle = 'red';
+        this.ctx.fill();
+        this.ctx.closePath();
+
+        console.log(this.player.verticalSpeed);
 
         this.checkAndEmitPosition();
         requestAnimationFrame(() => this.update());

@@ -9,8 +9,7 @@ const App: React.FC = () => {
     const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 
     const updateCanvasSize = () => {
-      // const aspectRatio = 1600 / 1048;
-      const aspectRatio = 3360 / 2538;
+      const aspectRatio = 1600 / 1048;
       let canvasWidth = window.innerWidth;
       let canvasHeight = window.innerHeight;
 
@@ -52,9 +51,9 @@ const App: React.FC = () => {
 
   return (
     <div id="container">
-      <canvas id="gameCanvas"></canvas>
       <canvas id="backgroundCanvas"></canvas>
       <canvas id="collisionCanvas"></canvas>
+      <canvas id="gameCanvas"></canvas>
     </div>
   );
 };
