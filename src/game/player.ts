@@ -7,6 +7,7 @@ export class Player {
     y: number;
     width: number;
     height: number;
+    playerName: string;
     color: string;
     speed: number;
     gravity: number;
@@ -36,9 +37,11 @@ export class Player {
     hand: HTMLImageElement;
     leg: HTMLImageElement;
 
-    legSwingDirection: number;
-    thighSwingAngle: number;
-    calfSwingAngle: number;
+    // Animacja nóg
+    leftThighAngle: number;  // Kąt dla lewego uda
+    rightThighAngle: number; // Kąt dla prawego uda
+    legSwingSpeed: number;   // Szybkość animacji
+    legPhase: number;        // Faza cyklu biegania (0 do 2π)
 
     headHitbox!: { x: number, y: number, width: number, height: number };
     torsoHitbox!: { x: number, y: number, width: number, height: number }
@@ -50,6 +53,7 @@ export class Player {
         this.id = id;
         this.x = x;
         this.y = y;
+        this.playerName = id;
         this.color = 'rgb(255, 0, 0, 0.5)';
         this.speed = 4;
         this.gravity = 0.19;
@@ -98,9 +102,11 @@ export class Player {
         this.leg.src = "./leg.png";
         this.leg.onload = this.checkImagesLoaded.bind(this);
 
-        this.legSwingDirection = 1; // Kierunek wahadła nogi (1 = naprzód, -1 = w tył)
-        this.thighSwingAngle = 0; // Kąt wychylenia uda
-        this.calfSwingAngle = 0; // Kąt wychylenia podudzia
+        // Animacja nóg
+        this.leftThighAngle = 0;
+        this.rightThighAngle = 0;
+        this.legSwingSpeed = 0.091; // Szybkość cyklu biegania
+        this.legPhase = 0;         // Początkowa faza cyklu
 
         this.width = this.torso.width - 3
         this.height = this.head.height + this.torso.height + this.leg.height + this.joint.height - 25;
@@ -192,8 +198,8 @@ export class Player {
         // Rysuj nogi
         // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle);
         // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle);
-        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle, 'orange');
-        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle, 'green');
+        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.leftThighAngle, 'orange');
+        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.rightThighAngle, 'green');
 
         // Rysuj tors i głowę
         // ctx.drawImage(this.torso, this.torsoHitbox.x, this.torsoHitbox.y);
@@ -208,13 +214,12 @@ export class Player {
     
         // Rysuj rękę z bronią
         this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft, this.camera);
-        // ctx.beginPath();
-        // ctx.arc(this.mouseX, this.mouseY, 5, 0, Math.PI * 2);
-        // ctx.fillStyle = 'green';
-        // ctx.fill();
-        // ctx.closePath();
+
         // Rysuj pasek zdrowia wycentrowany
         this.drawHealthBar(ctx);
+
+        // Rysuj nazwe gracza
+        this.drawPlayerName(ctx);
     
         ctx.restore();
     }
@@ -236,52 +241,93 @@ export class Player {
     //     ctx.restore();
     // }
 
-    drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number, color: string) {
-        ctx.save();
-        ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
+    // drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number, color: string) {
+    //     ctx.save();
+    //     ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
         
-        // Dodanie kąta 90 stopni (π/2) do orientacji nóg
-        const offsetAngle = Math.PI / 2;
+    //     // Dodanie kąta 90 stopni (π/2) do orientacji nóg
+    //     const offsetAngle = Math.PI / 2;
     
-        // Rysowanie uda
-        const thighLength = 15; // Długość uda
-        const calfLength = 15;  // Długość podudzia
+    //     // Rysowanie uda
+    //     const thighLength = 15; // Długość uda
+    //     const calfLength = 15;  // Długość podudzia
+    //     const kneeX = Math.cos(thighAngle + offsetAngle) * thighLength;
+    //     const kneeY = Math.sin(thighAngle + offsetAngle) * thighLength;
+    
+    //     ctx.strokeStyle = color;
+    //     ctx.lineWidth = 2;
+    //     ctx.beginPath();
+    //     ctx.moveTo(0, 0); // Punkt początkowy uda (biodro)
+    //     ctx.lineTo(kneeX, kneeY); // Koniec uda (kolano)
+    //     ctx.stroke();
+    
+    //     // Rysowanie podudzia
+    //     const footX = kneeX + Math.cos(thighAngle + calfAngle + offsetAngle) * calfLength;
+    //     const footY = kneeY + Math.sin(thighAngle + calfAngle + offsetAngle) * calfLength;
+    
+    //     ctx.beginPath();
+    //     ctx.moveTo(kneeX, kneeY); // Punkt początkowy podudzia (kolano)
+    //     ctx.lineTo(footX, footY); // Koniec podudzia (stopa)
+    //     ctx.stroke();
+    
+    //     ctx.restore();
+    // }
+
+    drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, color: string) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        const offsetAngle = Math.PI / 2; // Nogi skierowane w dół
+        const thighLength = 15;
+        const calfLength = 15;
+
+        // Oblicz kąt podudzia z ograniczeniem
+        const calfAngle = this.calculateCalfAngle(thighAngle);
+
         const kneeX = Math.cos(thighAngle + offsetAngle) * thighLength;
         const kneeY = Math.sin(thighAngle + offsetAngle) * thighLength;
-    
+
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, 0); // Punkt początkowy uda (biodro)
-        ctx.lineTo(kneeX, kneeY); // Koniec uda (kolano)
+        ctx.moveTo(0, 0);
+        ctx.lineTo(kneeX, kneeY);
         ctx.stroke();
-    
-        // Rysowanie podudzia
+
         const footX = kneeX + Math.cos(thighAngle + calfAngle + offsetAngle) * calfLength;
         const footY = kneeY + Math.sin(thighAngle + calfAngle + offsetAngle) * calfLength;
-    
+
         ctx.beginPath();
-        ctx.moveTo(kneeX, kneeY); // Punkt początkowy podudzia (kolano)
-        ctx.lineTo(footX, footY); // Koniec podudzia (stopa)
+        ctx.moveTo(kneeX, kneeY);
+        ctx.lineTo(footX, footY);
         ctx.stroke();
-    
+
         ctx.restore();
     }
 
-    // Animacja uda i podudzia
-    animateLegs() {
+    calculateCalfAngle(thighAngle: number): number {
         const maxThighSwing = Math.PI / 6; // Maksymalny kąt wychylenia uda
-        const swingSpeed = 0.035; // Szybkość wahadła
+        const normalizedAngle = Math.abs(thighAngle) / maxThighSwing;
 
-        // Animacja wychylenia uda
-        this.thighSwingAngle += swingSpeed * this.legSwingDirection;
-
-        // Animacja wychylenia podudzia z przesunięciem, by zginało się w kierunku uda
-        this.calfSwingAngle = this.thighSwingAngle / 2;
-
-        if (this.thighSwingAngle > maxThighSwing || this.thighSwingAngle < -maxThighSwing) {
-            this.legSwingDirection *= -1; // Zmiana kierunku wahadła
+        // Kolano zgina się tylko w tył (dodatni kąt względem uda)
+        if (thighAngle > 0) {
+            // Noga w przodzie: większe zgięcie kolana
+            return Math.PI / 6 * normalizedAngle; // Maksymalnie 30 stopni
+        } else {
+            // Noga w tyłu: mniejsze zgięcie lub wyprost
+            return Math.PI / 12 * (1 - normalizedAngle); // Maksymalnie 15 stopni
         }
+    }
+
+    animateLegs() {
+        const maxThighSwing = Math.PI / 6;
+
+        // Aktualizuj fazę cyklu biegania
+        this.legPhase += this.legSwingSpeed;
+
+        // Oblicz kąty dla lewej i prawej nogi
+        this.leftThighAngle = maxThighSwing * Math.sin(this.legPhase);
+        this.rightThighAngle = maxThighSwing * Math.sin(this.legPhase + Math.PI);
     }
 
     drawHand(ctx: CanvasRenderingContext2D, rawMouseX: number, rawMouseY: number, isFlipped: boolean, camera: Camera) {
@@ -424,11 +470,11 @@ export class Player {
             const gunWidth = 50;
             const gunHeight = 25;
         
-            // ctx.drawImage(
-            //     this.gun_model,
-            //     0, -gunHeight / 2,
-            //     gunWidth, gunHeight
-            // );
+            ctx.drawImage(
+                this.gun_model,
+                0, -gunHeight / 2,
+                gunWidth, gunHeight
+            );
         
             ctx.restore();
         }
@@ -496,18 +542,19 @@ export class Player {
         let newX = this.x;
         let newY = this.y;
 
-        // Ruch poziomy
         if (keysPressed['d']) {
             newX += this.speed;
-            this.animateLegs()
-        }
-
-        if (keysPressed['a']) { 
+            this.animateLegs();
+        } else if (keysPressed['a']) { 
             newX -= this.speed;
             this.animateLegs();
+        } else {
+            // Wygaszanie animacji, gdy gracz stoi
+            this.leftThighAngle *= 0.9;
+            this.rightThighAngle *= 0.9;
+            this.legPhase = 0; // Reset fazy, gdy stoi
         }
 
-        // Sprawdzenie kolizji dla osi X (ruch w bok)
         const horizontalPolygon = [
             { x: newX, y: this.y },
             { x: newX + this.width, y: this.y },
@@ -516,10 +563,9 @@ export class Player {
         ];
 
         if (!collisionChecker.checkPlayerCollision(horizontalPolygon)) {
-            this.x = newX; // Aktualizacja pozycji X tylko, jeśli brak kolizji
+            this.x = newX;
         } else {
-            // Gradualne sprawdzanie nachylenia, aby umożliwić płynne wspinanie
-            const maxStepUpHeight = 10; // Maksymalna wysokość, na jaką gracz może wejść przy jednym kroku
+            const maxStepUpHeight = 10;
             let stepUpSuccessful = false;
 
             for (let i = 1; i <= maxStepUpHeight; i++) {
@@ -531,7 +577,6 @@ export class Player {
                 ];
 
                 if (!collisionChecker.checkPlayerCollision(slopePolygon)) {
-                    // Pozwól graczowi "wejść" na obiekt na obliczoną wysokość nachylenia
                     this.x = newX;
                     this.y -= i;
                     stepUpSuccessful = true;
@@ -539,17 +584,14 @@ export class Player {
                 }
             }
 
-            // Jeśli nie udało się wejść pod górkę, gracz pozostaje na oryginalnej pozycji
             if (!stepUpSuccessful) {
                 this.x = this.x;
             }
         }
 
-        // Dodanie grawitacji do osi Y
         this.verticalSpeed += this.gravity;
         newY += this.verticalSpeed;
 
-        // Sprawdzenie kolizji dla osi Y (spadanie)
         const verticalPolygon = [
             { x: this.x, y: newY },
             { x: this.x + this.width, y: newY },
@@ -558,15 +600,13 @@ export class Player {
         ];
 
         if (!collisionChecker.checkPlayerCollision(verticalPolygon)) {
-            this.y = newY; // Aktualizacja pozycji Y tylko, jeśli brak kolizji
+            this.y = newY;
         } else {
-            // Resetowanie ruchu pionowego przy kolizji
             this.verticalSpeed = 0;
         }
 
         this.updateHitboxes();
     }
-
 
     takeDamage(damage: number): boolean {
         this.health = Math.max(0, this.health - damage);
@@ -615,6 +655,21 @@ export class Player {
     
         // Sprawdzamy kolizję poniżej gracza za pomocą CollisionChecker
         return collisionChecker.checkPlayerCollision(groundCheckPolygon);
+    }
+
+    drawPlayerName(ctx: CanvasRenderingContext2D) {
+        const nameWidth = this.width + 50;
+        const nameX = this.x + this.width / 2 - nameWidth / 2;
+        const nameY = this.y - 50;
+
+        ctx.fillStyle = 'rgb(255, 0, 221)';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+            `${this.playerName}`, 
+            nameX + nameWidth / 2, 
+            nameY + 10
+        );
     }
 
     drawHealthBar(ctx: CanvasRenderingContext2D) {

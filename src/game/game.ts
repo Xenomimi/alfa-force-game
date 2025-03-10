@@ -97,9 +97,9 @@ export class Game {
                 this.player.isAlive = data.isAlive;
                 this.player.x = data.x;
                 this.player.y = data.y;
-                this.player.legSwingDirection = data.legSwingDirection;
-                this.player.thighSwingAngle = data.thighSwingAngle;
-                this.player.calfSwingAngle = data.calfSwingAngle;
+                // this.player.legSwingDirection = data.legSwingDirection;
+                // this.player.thighSwingAngle = data.thighSwingAngle;
+                // this.player.calfSwingAngle = data.calfSwingAngle;
                 this.player.headHitbox = data.headHitbox;
                 this.player.torsoHitbox = data.torsoHitbox;
                 this.player.legHitbox = data.legHitbox;
@@ -108,9 +108,9 @@ export class Game {
                 otherPlayers[data.playerId].isAlive = data.isAlive;
                 otherPlayers[data.playerId].x = data.x;
                 otherPlayers[data.playerId].y = data.y;
-                otherPlayers[data.playerId].legSwingDirection = data.legSwingDirection;
-                otherPlayers[data.playerId].thighSwingAngle = data.thighSwingAngle;
-                otherPlayers[data.playerId].calfSwingAngle = data.calfSwingAngle;
+                // otherPlayers[data.playerId].legSwingDirection = data.legSwingDirection;
+                // otherPlayers[data.playerId].thighSwingAngle = data.thighSwingAngle;
+                // otherPlayers[data.playerId].calfSwingAngle = data.calfSwingAngle;
                 otherPlayers[data.playerId].headHitbox = data.headHitbox;
                 otherPlayers[data.playerId].torsoHitbox = data.torsoHitbox;
                 otherPlayers[data.playerId].legHitbox = data.legHitbox;
@@ -124,9 +124,9 @@ export class Game {
                     this.player = new Player(id, players[id].x, players[id].y, this.camera);
                     this.player.mouseX = players[id].handX;
                     this.player.mouseY = players[id].handY;
-                    this.player.legSwingDirection = players[id].legSwingDirection;
-                    this.player.thighSwingAngle = players[id].thighSwingAngle;
-                    this.player.calfSwingAngle = players[id].calfSwingAngle;
+                    // this.player.legSwingDirection = players[id].legSwingDirection;
+                    // this.player.thighSwingAngle = players[id].thighSwingAngle;
+                    // this.player.calfSwingAngle = players[id].calfSwingAngle;
                     this.player.headHitbox = players[id].headHitbox;
                     this.player.torsoHitbox = players[id].torsoHitbox;
                     this.player.legHitbox = players[id].legHitbox;
@@ -134,9 +134,9 @@ export class Game {
                     otherPlayers[id] = new Player(id, players[id].x, players[id].y, this.camera);
                     otherPlayers[id].mouseX = players[id].handX;
                     otherPlayers[id].mouseY = players[id].handY;
-                    otherPlayers[id].legSwingDirection = players[id].legSwingDirection;
-                    otherPlayers[id].thighSwingAngle = players[id].thighSwingAngle;
-                    otherPlayers[id].calfSwingAngle = players[id].calfSwingAngle;
+                    // otherPlayers[id].legSwingDirection = players[id].legSwingDirection;
+                    // otherPlayers[id].thighSwingAngle = players[id].thighSwingAngle;
+                    // otherPlayers[id].calfSwingAngle = players[id].calfSwingAngle;
                     otherPlayers[id].headHitbox = players[id].headHitbox;
                     otherPlayers[id].torsoHitbox = players[id].torsoHitbox;
                     otherPlayers[id].legHitbox = players[id].legHitbox;
@@ -169,9 +169,9 @@ export class Game {
                 player.y = data.y;
                 player.mouseX = data.handX;
                 player.mouseY = data.handY;
-                player.legSwingDirection = data.legSwingDirection;
-                player.thighSwingAngle = data.thighSwingAngle;
-                player.calfSwingAngle = data.calfSwingAngle;
+                // player.legSwingDirection = data.legSwingDirection;
+                // player.thighSwingAngle = data.thighSwingAngle;
+                // player.calfSwingAngle = data.calfSwingAngle;
                 player.headHitbox.x = data.headHitbox.x;
                 player.headHitbox.y = data.headHitbox.y;
                 player.torsoHitbox.x = data.torsoHitbox.x;
@@ -281,9 +281,9 @@ export class Game {
                 y: this.player.y,
                 handX: this.mouseX,
                 handY: this.mouseY,
-                legSwingDirection: this.player.legSwingDirection,
-                thighSwingAngle: this.player.thighSwingAngle,
-                calfSwingAngle: this.player.calfSwingAngle,
+                // legSwingDirection: this.player.legSwingDirection,
+                // thighSwingAngle: this.player.thighSwingAngle,
+                // calfSwingAngle: this.player.calfSwingAngle,
                 headHitbox: { x: this.player.headHitbox.x, y: this.player.headHitbox.y },
                 torsoHitbox: { x: this.player.torsoHitbox.x, y: this.player.torsoHitbox.y },
                 legHitbox: { x: this.player.legHitbox.x, y: this.player.legHitbox.y }
