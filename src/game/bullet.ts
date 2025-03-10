@@ -82,8 +82,9 @@ export class Bullet {
             const size = this.radius * (1 - (index / this.trail.length) * 0.7); // Wolniejsze zmniejszanie rozmiaru
             ctx.beginPath();
             ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(187, 188, 189, ${point.alpha * 0.5})`; // Zwiększona podstawowa przezroczystość
+            ctx.fillStyle = `rgba(0, 255, 0, ${point.alpha * 0.5})`; // Zwiększona podstawowa przezroczystość
             ctx.fill();
+            // 187, 188, 189
         });
 
         // Save context state
