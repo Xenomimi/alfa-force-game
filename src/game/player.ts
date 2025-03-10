@@ -107,8 +107,6 @@ export class Player {
     
         // Ustal hitboxy dla każdej części ciała w odpowiednich pozycjach
         this.initializeHitboxes();
-
-
     }
 
     checkImagesLoaded(): void {
@@ -426,11 +424,11 @@ export class Player {
             const gunWidth = 50;
             const gunHeight = 25;
         
-            ctx.drawImage(
-                this.gun_model,
-                0, -gunHeight / 2,
-                gunWidth, gunHeight
-            );
+            // ctx.drawImage(
+            //     this.gun_model,
+            //     0, -gunHeight / 2,
+            //     gunWidth, gunHeight
+            // );
         
             ctx.restore();
         }

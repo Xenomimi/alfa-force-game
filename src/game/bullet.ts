@@ -95,6 +95,7 @@ export class Bullet {
             ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(0, 255, 0, ${point.alpha * 0.5})`;
             ctx.fill();
+            // 187, 188, 189
         });
 
         ctx.save();
