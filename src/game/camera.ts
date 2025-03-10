@@ -10,6 +10,8 @@ export class Camera {
     followed?: Player;
     xDeadZone: number;
     yDeadZone: number;
+    maxOffsetX: number; // Nowy limit dla osi X
+    maxOffsetY: number; // Nowy limit dla osi Y
 
     constructor(viewportWidth: number, viewportHeight: number, worldWidth: number, worldHeight: number) {
         this.xView = 0;
@@ -20,6 +22,8 @@ export class Camera {
         this.worldHeight = worldHeight;
         this.xDeadZone = viewportWidth / 2;
         this.yDeadZone = viewportHeight / 2;
+        this.maxOffsetX = 1000; // Maksymalne przesunięcie w osi X (np. 400 pikseli)
+        this.maxOffsetY = 1000; // Maksymalne przesunięcie w osi Y (np. 300 pikseli)
     }
 
     follow(player: Player) {
@@ -32,26 +36,30 @@ export class Camera {
 
     update(mousePosition: { x: number, y: number }, lerpFactor: number = 0.05) {
         if (this.followed) {
-            // Cel kamery pomiędzy pozycją gracza a pozycją myszy
-            const targetX = this.followed.x - this.xDeadZone + (mousePosition.x - (this.followed.x - this.xDeadZone)) * 0.3;
-            const targetY = this.followed.y - this.yDeadZone + (mousePosition.y - (this.followed.y - this.yDeadZone)) * 0.3;
-
-            // Aktualizacja pozycji kamery przy użyciu interpolacji
+            // Przelicz pozycję myszy z viewportu na współrzędne świata
+            const mouseWorldX = this.xView + mousePosition.x;
+            const mouseWorldY = this.yView + mousePosition.y;
+    
+            // Oblicz przesunięcie kamery na podstawie pozycji myszy
+            let offsetX = (mouseWorldX - this.followed.x) * 0.5;
+            let offsetY = (mouseWorldY - this.followed.y) * 0.7;
+    
+            // Ogranicz przesunięcie do maksymalnych wartości
+            offsetX = Math.max(-this.maxOffsetX, Math.min(this.maxOffsetX, offsetX));
+            offsetY = Math.max(-this.maxOffsetY, Math.min(this.maxOffsetY, offsetY));
+    
+            // Cel kamery: pozycja gracza + ograniczone przesunięcie
+            const targetX = this.followed.x - this.xDeadZone + offsetX;
+            const targetY = this.followed.y - this.yDeadZone + offsetY;
+    
+            // Interpolacja pozycji kamery
             this.xView = this.lerp(this.xView, targetX, lerpFactor);
             this.yView = this.lerp(this.yView, targetY, lerpFactor);
-
-            // Ograniczenia kamery
-            if (this.xView < 0) {
-                this.xView = 0;
-            } else if (this.xView > this.worldWidth - this.viewportWidth) {
-                this.xView = this.worldWidth - this.viewportWidth;
-            }
-
-            if (this.yView < 0) {
-                this.yView = 0;
-            } else if (this.yView > this.worldHeight - this.viewportHeight) {
-                this.yView = this.worldHeight - this.viewportHeight;
-            }
+    
+            // Ograniczenia kamery do granic świata
+            this.xView = Math.max(0, Math.min(this.xView, this.worldWidth - this.viewportWidth));
+            this.yView = Math.max(0, Math.min(this.yView, this.worldHeight - this.viewportHeight));
         }
     }
+
 }

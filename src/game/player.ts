@@ -107,6 +107,8 @@ export class Player {
     
         // Ustal hitboxy dla każdej części ciała w odpowiednich pozycjach
         this.initializeHitboxes();
+
+
     }
 
     checkImagesLoaded(): void {
@@ -190,22 +192,29 @@ export class Player {
         ctx.strokeRect(this.x, this.y, this.width, this.height);
     
         // Rysuj nogi
-        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle);
-        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle);
-    
+        // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle);
+        // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle);
+        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle, 'orange');
+        this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle, 'green');
+
         // Rysuj tors i głowę
-        ctx.drawImage(this.torso, this.torsoHitbox.x, this.torsoHitbox.y);
-        // ctx.strokeStyle = 'blue';
-        // ctx.lineWidth = 1;
-        // ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torsoHitbox.width, this.torsoHitbox.height);
+        // ctx.drawImage(this.torso, this.torsoHitbox.x, this.torsoHitbox.y);
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torsoHitbox.width, this.torsoHitbox.height);
         
-        ctx.drawImage(this.head, this.headHitbox.x, this.headHitbox.y);
-        // ctx.strokeStyle = 'blue';
-        // ctx.lineWidth = 1;
-        // ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
+        // ctx.drawImage(this.head, this.headHitbox.x, this.headHitbox.y);
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
     
         // Rysuj rękę z bronią
         this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft, this.camera);
+        // ctx.beginPath();
+        // ctx.arc(this.mouseX, this.mouseY, 5, 0, Math.PI * 2);
+        // ctx.fillStyle = 'green';
+        // ctx.fill();
+        // ctx.closePath();
         // Rysuj pasek zdrowia wycentrowany
         this.drawHealthBar(ctx);
     
@@ -213,19 +222,51 @@ export class Player {
     }
 
     // Rysowanie nogi z ugięciem w kolanie
-    drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number) {
+    // drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number) {
+    //     ctx.save();
+    //     ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
+    //     ctx.rotate(thighAngle); // Obrót uda (joint)
+
+    //     // Rysuj udo (joint)
+    //     ctx.drawImage(this.joint, -this.joint.width / 2, -5);
+
+    //     // Przejdź do końca uda i rysuj podudzie (leg) z dodatkowym kątem dla zgięcia kolana
+    //     ctx.translate(3, this.joint.height / 3);
+    //     ctx.rotate(calfAngle); // Zgięcie w kolanie
+    //     ctx.drawImage(this.leg, -this.leg.width / 2, 0);
+
+    //     ctx.restore();
+    // }
+
+    drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number, color: string) {
         ctx.save();
         ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
-        ctx.rotate(thighAngle); // Obrót uda (joint)
-
-        // Rysuj udo (joint)
-        ctx.drawImage(this.joint, -this.joint.width / 2, -5);
-
-        // Przejdź do końca uda i rysuj podudzie (leg) z dodatkowym kątem dla zgięcia kolana
-        ctx.translate(3, this.joint.height / 3);
-        ctx.rotate(calfAngle); // Zgięcie w kolanie
-        ctx.drawImage(this.leg, -this.leg.width / 2, 0);
-
+        
+        // Dodanie kąta 90 stopni (π/2) do orientacji nóg
+        const offsetAngle = Math.PI / 2;
+    
+        // Rysowanie uda
+        const thighLength = 15; // Długość uda
+        const calfLength = 15;  // Długość podudzia
+        const kneeX = Math.cos(thighAngle + offsetAngle) * thighLength;
+        const kneeY = Math.sin(thighAngle + offsetAngle) * thighLength;
+    
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); // Punkt początkowy uda (biodro)
+        ctx.lineTo(kneeX, kneeY); // Koniec uda (kolano)
+        ctx.stroke();
+    
+        // Rysowanie podudzia
+        const footX = kneeX + Math.cos(thighAngle + calfAngle + offsetAngle) * calfLength;
+        const footY = kneeY + Math.sin(thighAngle + calfAngle + offsetAngle) * calfLength;
+    
+        ctx.beginPath();
+        ctx.moveTo(kneeX, kneeY); // Punkt początkowy podudzia (kolano)
+        ctx.lineTo(footX, footY); // Koniec podudzia (stopa)
+        ctx.stroke();
+    
         ctx.restore();
     }
 
@@ -257,6 +298,13 @@ export class Player {
         } else {
             shoulderX = this.x + 5;
         }
+
+        // Punkt zaczepny do rysowania gracza
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        ctx.closePath();
 
         const shoulderY = this.y + 16;
     
@@ -299,15 +347,15 @@ export class Player {
         // Wektor od ręki do punktu wystrzału (zielony)
         ctx.beginPath();
         ctx.moveTo(endX, endY);
-        ctx.lineTo(endX + dirX * 10, endY + dirY * 10); // Krótka linia wyjściowa
-        ctx.strokeStyle = 'green';
+        ctx.lineTo(endX + dirX * 20, endY + dirY * 20); // Krótka linia wyjściowa
+        ctx.strokeStyle = 'rgb(255, 255, 255, 1)';
         ctx.lineWidth = 2;
         ctx.stroke();
     
         // Punkt wystrzału
         ctx.beginPath();
         ctx.arc(this.getHandPosition().x, this.getHandPosition().y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgb(0, 255, 0, 1)';
+        ctx.fillStyle = 'rgb(0, 255, 255, 1)';
         ctx.fill();
         
         ctx.save();
@@ -339,7 +387,7 @@ export class Player {
         ctx.save();
         
         if (this.joint.complete) {
-            ctx.drawImage(this.forearm, -3, -this.forearm.height / 2);
+            // ctx.drawImage(this.forearm, -3, -this.forearm.height / 2);
         }
         ctx.restore();
         ctx.restore();
@@ -357,7 +405,7 @@ export class Player {
         ctx.save();
         
         if (this.hand.complete) {
-            ctx.drawImage(this.hand, -7, -this.hand.height / 2);
+            // ctx.drawImage(this.hand, -7, -this.hand.height / 2);
         }
         ctx.restore();
         ctx.restore();
@@ -552,6 +600,7 @@ export class Player {
         if (this.isOnGround(collisionChecker)) {
             this.verticalSpeed = -13; // Ustaw prędkość skoku
         }
+        // this.verticalSpeed = -13; // Ustaw prędkość skoku
     }
 
     isOnGround(collisionChecker: CollisionChecker): boolean {
@@ -607,9 +656,17 @@ export class Player {
     }
     
     getShoulderPosition(): { x: number; y: number } {
-        const flipLeft = this.mouseX < this.x + this.width / 2;
+        // Pozycja gracza na ekranie względem kamery
+        const screenX = this.x - this.camera.xView;
+        const screenCenterX = screenX + this.width / 2;
+    
+        // Określ, czy kursor jest po lewej czy prawej stronie środka gracza na ekranie
+        const flipLeft = this.mouseX < screenCenterX;
+    
+        // Ustal pozycję ramienia (lewa lub prawa krawędź gracza)
         const shoulderX = flipLeft ? this.x + this.width - 5 : this.x + 5;
         const shoulderY = this.y + 16;
+    
         return { x: shoulderX, y: shoulderY };
     }
 

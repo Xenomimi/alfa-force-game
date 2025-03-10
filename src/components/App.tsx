@@ -5,7 +5,6 @@ import '../styles/style.css';
 const App: React.FC = () => {
   React.useEffect(() => {
     const backgroundCanvas = document.getElementById('backgroundCanvas') as HTMLCanvasElement;
-    const collisionCanvas = document.getElementById('collisionCanvas') as HTMLCanvasElement;
     const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 
     const updateCanvasSize = () => {
@@ -20,13 +19,12 @@ const App: React.FC = () => {
       }
 
       // Ustawienie rozmiarów dla każdego płótna
-      [backgroundCanvas, collisionCanvas, gameCanvas].forEach(canvas => {
+      [backgroundCanvas, gameCanvas].forEach(canvas => {
         canvas.style.width = `${canvasWidth}px`;
         canvas.style.height = `${canvasHeight}px`;
         canvas.width = 1600; // Rozdzielczość wewnętrzna
         canvas.height = 1048;
       });
-
       // Rozdzielczość wewnętrzna płótna gry (widoczny obszar)
       gameCanvas.width = 1600;
       gameCanvas.height = 1048;
@@ -34,14 +32,17 @@ const App: React.FC = () => {
       // Większa rozdzielczość wewnętrzna tła i kolizji (rozmiar mapy)
       backgroundCanvas.width = 3360; // Podwójna szerokość
       backgroundCanvas.height = 2538; // Podwójna wysokość
-      collisionCanvas.width = 3360;
-      collisionCanvas.height = 2538;
+
+      // backgroundCanvas.width = 2240; // Podwójna szerokość
+      // backgroundCanvas.height = 1692; // Podwójna wysokość
+      // collisionCanvas.width = 2240;
+      // collisionCanvas.height = 1692;
     };
 
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
 
-    const game = new Game(backgroundCanvas, collisionCanvas, gameCanvas);
+    const game = new Game(backgroundCanvas, gameCanvas);
     game.start();
 
     return () => {
@@ -51,8 +52,7 @@ const App: React.FC = () => {
 
   return (
     <div id="container">
-      <canvas id="backgroundCanvas"></canvas>
-      <canvas id="collisionCanvas"></canvas>
+      <canvas style={{display: 'none'}} id="backgroundCanvas"></canvas>
       <canvas id="gameCanvas"></canvas>
     </div>
   );

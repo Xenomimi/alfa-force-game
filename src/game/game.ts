@@ -4,8 +4,7 @@ import { Bullet } from "./bullet";
 import { Camera } from "./camera";
 import CollisionChecker from "./collisionChecker"
 import mapData from "../assets/map_data.json";
-
-
+import { DirectionVector } from './directionVector';
 
 const socket = io('http://localhost:3000');
 const keysPressed: { [key: string]: boolean } = {};
@@ -16,10 +15,8 @@ const collisionChecker = new CollisionChecker(collisionObjects, 3);
 
 export class Game {
     canvas: HTMLCanvasElement;
-    collisionCanvas: HTMLCanvasElement;
     backgroundCanvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
-    collisionCtx: CanvasRenderingContext2D;
     backgroundCtx: CanvasRenderingContext2D;
     backgroundImage: HTMLImageElement;
     foregroundImage: HTMLImageElement;
@@ -32,15 +29,13 @@ export class Game {
     mouseY: number;
     bullets: Bullet[];
     private shootSound: HTMLAudioElement;
-
-    constructor(backgroundCanvas: HTMLCanvasElement, collisionCanvas: HTMLCanvasElement, gameCanvas: HTMLCanvasElement) {
+    directionVector: DirectionVector;
+    constructor(backgroundCanvas: HTMLCanvasElement, gameCanvas: HTMLCanvasElement) {
         // Canvas init
         this.canvas = gameCanvas;
-        this.collisionCanvas = collisionCanvas;
         this.backgroundCanvas = backgroundCanvas;
         // Context init
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
-        this.collisionCtx = this.collisionCanvas.getContext('2d') as CanvasRenderingContext2D;
         this.backgroundCtx = this.backgroundCanvas.getContext('2d') as CanvasRenderingContext2D;
         // Map images init
         this.backgroundImage = new Image();
@@ -198,7 +193,8 @@ export class Game {
                 data.y,
                 data.targetX,
                 data.targetY,
-                data.playerId
+                data.playerId,
+                collisionChecker
             );
             this.bullets.push(bullet);
         });
@@ -216,6 +212,14 @@ export class Game {
         });
 
         this.setupEventListeners();
+
+        this.directionVector = new DirectionVector(this.backgroundCanvas, {
+            strokeColor: 'blue',   // Kolor linii
+            fillColor: 'blue',     // Kolor grotu
+            lineWidth: 3,          // Grubość linii
+            arrowLength: 60,       // Długość strzałki
+            arrowSize: 12          // Rozmiar grotu
+        });
     }
 
     setupEventListeners() {
@@ -311,10 +315,6 @@ export class Game {
         ctx.lineWidth = 2;
         const scaleFactor = 3;
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        ctx.strokeStyle = "red";
-        ctx.lineWidth = 2;
-        
-
 
         collisionObjects?.forEach((obj: any) => {
             if (obj.polygon) {
@@ -369,7 +369,9 @@ export class Game {
                     break;
                 }
             }
-            if (bullet.isOffscreen(this.backgroundCanvas.width, this.backgroundCanvas.height)) {
+    
+            // Usuń pocisk, jeśli jest poza ekranem lub koliduje z mapą
+            if (bullet.shouldRemove(this.backgroundCanvas.width, this.backgroundCanvas.height)) {
                 this.bullets.splice(i, 1);
             }
         }
@@ -397,64 +399,96 @@ export class Game {
 
     handlePlayerShooting() {
         let shootingInterval: NodeJS.Timeout | null = null;
-        
+    
+        const calculateHandPositionAndDirection = (player: Player, mouseX: number, mouseY: number, camera: Camera) => {
+            const adjustedMouseX = mouseX + camera.xView;
+            const adjustedMouseY = mouseY + camera.yView;
+            const isFlipped = mouseX < (player.x - camera.xView + player.width / 2);
+            const shoulderX = isFlipped ? player.x + player.width - 5 : player.x + 5;
+            const shoulderY = player.y + 16;
+    
+            let dirX = adjustedMouseX - shoulderX;
+            let dirY = adjustedMouseY - shoulderY;
+            const length = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (length > 0) {
+                dirX = dirX / length;
+                dirY = dirY / length;
+            }
+    
+            const upperArmLength = 15;
+            const forearmLength = 15;
+            const elbowX = shoulderX + dirX * upperArmLength;
+            const elbowY = shoulderY + dirY * upperArmLength;
+            const handX = elbowX + dirX * forearmLength;
+            const handY = elbowY + dirY * forearmLength;
+    
+            const targetDistance = 1000;
+            const targetX = handX + dirX * targetDistance;
+            const targetY = handY + dirY * targetDistance;
+    
+            return { handPos: { x: handX, y: handY }, targetX, targetY };
+        };
+    
         document.addEventListener('mousedown', () => {
-            // Blokada strzelania jeżeli gracz jest martwy
-            if(!this.player.isAlive) return
-
-            // Pojedynczy strzał
+            if (!this.player.isAlive) return;
+    
+            const { handPos, targetX, targetY } = calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
+    
             const bullet = new Bullet(
-                this.player.getHandPosition().x,
-                this.player.getHandPosition().y,
-                this.player.getShoulderPosition().x,
-                this.player.getShoulderPosition().y,
-                this.player.id
+                handPos.x,
+                handPos.y,
+                targetX,
+                targetY,
+                this.player.id,
+                collisionChecker
             );
-            this.bullets.push(bullet); // Dodaj pocisk do tablicy
-            // Przekaż innym jeden strzał
+            this.bullets.push(bullet);
+    
             socket.emit('player_shoot', {
-                x: this.player.getHandPosition().x,
-                y: this.player.getHandPosition().y,
-                targetX: this.player.getShoulderPosition().x,
-                targetY: this.player.getShoulderPosition().y,
+                x: handPos.x,
+                y: handPos.y,
+                targetX: targetX,
+                targetY: targetY,
                 playerId: this.player.id
             });
-            // Puść dźwięk pojedynczego strzału
+    
             const shootSoundInstance = new Audio(this.shootSound.src);
-            shootSoundInstance.volume = this.shootSound.volume;  // Ustaw tę samą głośność
+            shootSoundInstance.volume = this.shootSound.volume;
             shootSoundInstance.play();
-
+    
             if (!shootingInterval) {
                 shootingInterval = setInterval(() => {
-                    const bullet = new Bullet(
-                        this.player.getHandPosition().x,
-                        this.player.getHandPosition().y,
-                        this.player.getShoulderPosition().x,
-                        this.player.getShoulderPosition().y,
-                        this.player.id
-                    );
+                    const { handPos, targetX, targetY } = calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
     
-                    this.bullets.push(bullet); // Dodaj pocisk do tablicy
-
+                    const bullet = new Bullet(
+                        handPos.x,
+                        handPos.y,
+                        targetX,
+                        targetY,
+                        this.player.id,
+                        collisionChecker
+                    );
+                    this.bullets.push(bullet);
+    
                     socket.emit('player_shoot', {
-                        x: this.player.getHandPosition().x,
-                        y: this.player.getHandPosition().y,
-                        targetX: this.player.getShoulderPosition().x,
-                        targetY: this.player.getShoulderPosition().y,
+                        x: handPos.x,
+                        y: handPos.y,
+                        targetX: targetX,
+                        targetY: targetY,
                         playerId: this.player.id
                     });
-
+    
                     const shootSoundInstance = new Audio(this.shootSound.src);
-                    shootSoundInstance.volume = this.shootSound.volume;  // Ustaw tę samą głośność
+                    shootSoundInstance.volume = this.shootSound.volume;
                     shootSoundInstance.play();
                 }, 100);
             }
         });
-
+    
         document.addEventListener('mouseup', () => {
             if (shootingInterval) {
-                clearInterval(shootingInterval); // Zatrzymaj interwał
-                shootingInterval = null; // Zresetuj zmienną
+                clearInterval(shootingInterval);
+                shootingInterval = null;
             }
         });
     }
@@ -492,7 +526,6 @@ export class Game {
     drawContextLines() {
         const contextColors = [
             { ctx: this.backgroundCtx, color: "blue" },
-            { ctx: this.collisionCtx, color: "green" },
             { ctx: this.ctx, color: "red" }
         ];
 
@@ -506,13 +539,17 @@ export class Game {
     }
 
     drawBackground(ctx: CanvasRenderingContext2D) {
-        ctx.drawImage(
-            this.backgroundImage,
-            0,
-            0,
-            ctx.canvas.width,
-            ctx.canvas.height
-        )
+        this.drawCollisionMap(ctx);
+
+        // Rysowanie tekstury mapy
+
+        // ctx.drawImage(
+        //     this.backgroundImage,
+        //     0,
+        //     0,
+        //     ctx.canvas.width,
+        //     ctx.canvas.height
+        // );
     }
 
     drawForeground(ctx: CanvasRenderingContext2D) {
@@ -527,55 +564,73 @@ export class Game {
 
     renderGame() {
         // Czyszczenie poprzedniej instacji gry
-        
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // this.drawContextLines();
+        // Rysowanie mapy
         this.drawBackground(this.backgroundCtx);
+
+        // this.drawCollisionMap(this.backgroundCtx);
         //Bloku ruch gracza jeżeli jest martwy
+        
+        // Rysowanie gracza
+        this.player.draw(this.backgroundCtx);
+        
+    //     this.directionVector.draw(
+    //         this.player.getShoulderPosition().x,
+    //         this.player.getShoulderPosition().y,
+    //         this.player.getHandPosition().x,
+    //         this.player.getHandPosition().y,
+    // );
+
+        // Update pozycji gracza i kamera
         if (this.player.isAlive) {
             this.player.move(keysPressed, collisionChecker);
             this.camera.update({x: this.mouseX, y: this.mouseY});
         }
-        // Rysowanie gracza
-        this.player.draw(this.backgroundCtx);
 
+        // Rysowanie pozostałych graczy
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.backgroundCtx);
         }
 
-        // Aktualizacja pocisków
+        // Aktualizacja pocisków gracza oraz innych graczy
         this.updateBullets();
         for (const bullet of this.bullets) {
             bullet.draw(this.backgroundCtx);
         }
 
+        // Rysowanie ekranu śmierci oraz animacji
         if (!this.player.isAlive) {
             this.player.drawDeathAnimation(this.backgroundCtx);
             this.player.drawDeathScreen(this.backgroundCtx);
         }
-
         // this.drawForeground(this.backgroundCtx);
+        this.drawContextLines();
     }
-
+    
     renderCameraView() {
+        // Wyczyść canvas gry
         this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-
+    
+        // Oblicz widoczny obszar z uwzględnieniem granic mapy
+        const renderWidth = Math.min(this.camera.viewportWidth, this.backgroundCanvas.width - this.camera.xView);
+        const renderHeight = Math.min(this.camera.viewportHeight, this.backgroundCanvas.height - this.camera.yView);
+    
+        // Renderuj tylko widoczny fragment backgroundCanvas
         this.ctx.drawImage(
             this.backgroundCanvas,
-            this.camera.xView,
-            this.camera.yView,
-            1600,
-            1048,
-            0,
-            0,
-            this.ctx.canvas.width,
-            this.ctx.canvas.height
-        )
+            this.camera.xView,    // Źródłowe X na backgroundCanvas
+            this.camera.yView,    // Źródłowe Y na backgroundCanvas
+            renderWidth,          // Szerokość widocznego obszaru
+            renderHeight,         // Wysokość widocznego obszaru
+            0,                    // Docelowe X na canvasie gry
+            0,                    // Docelowe Y na canvasie gry
+            this.ctx.canvas.width, // Docelowa szerokość (rozciąga się do rozmiaru canvasu)
+            this.ctx.canvas.height // Docelowa wysokość (rozciąga się do rozmiaru canvasu)
+        );
     }
 
     update() {
-
         this.renderGame();
         this.renderCameraView();
 
@@ -585,8 +640,6 @@ export class Game {
         this.ctx.fillStyle = 'red';
         this.ctx.fill();
         this.ctx.closePath();
-
-        console.log(this.player.verticalSpeed);
 
         this.checkAndEmitPosition();
         requestAnimationFrame(() => this.update());
