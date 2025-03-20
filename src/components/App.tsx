@@ -32,11 +32,6 @@ const App: React.FC = () => {
       // Większa rozdzielczość wewnętrzna tła i kolizji (rozmiar mapy)
       backgroundCanvas.width = 3360; // Podwójna szerokość
       backgroundCanvas.height = 2538; // Podwójna wysokość
-
-      // backgroundCanvas.width = 2240; // Podwójna szerokość
-      // backgroundCanvas.height = 1692; // Podwójna wysokość
-      // collisionCanvas.width = 2240;
-      // collisionCanvas.height = 1692;
     };
 
     updateCanvasSize();

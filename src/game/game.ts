@@ -1,4 +1,4 @@
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import { Player } from "./player";
 import { Bullet } from "./bullet";
 import { Camera } from "./camera";
@@ -6,7 +6,10 @@ import CollisionChecker from "./collisionChecker"
 import mapData from "../assets/map_data.json";
 import { DirectionVector } from './directionVector';
 
-const socket = io('http://localhost:3000');
+type Point = { x: number; y: number };
+type Polygon = Point[];
+
+const socket: Socket = io('http://localhost:3000');
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};  // Przechowuj pozostałych graczy
 const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1")!;
@@ -24,7 +27,7 @@ export class Game {
     cameraX: number;
     cameraY: number;
     player: Player;
-    prevPlayerPosition: { x: number, y: number, mouseX: number, mouseY: number };
+    prevPlayerPosition: { x: number, y: number, mouseX: number, mouseY: number, leftThighAngle : number, rightThighAngle: number, legPhase: number };
     mouseX: number;
     mouseY: number;
     bullets: Bullet[];
@@ -45,12 +48,15 @@ export class Game {
         // Camera init
         this.camera = new Camera(this.canvas.width, this.canvas.height, this.backgroundCanvas.width, this.backgroundCanvas.height);
         // Player init
-        this.player = new Player(socket.id as string, 850, 300, this.camera);
+        this.player = new Player(socket, 850, 300, this.camera);
         this.prevPlayerPosition = { 
             x: this.player.x, 
             y: this.player.y, 
             mouseX: this.player.mouseX, 
-            mouseY: this.player.mouseY
+            mouseY: this.player.mouseY,
+            leftThighAngle: this.player.leftThighAngle,
+            rightThighAngle: this.player.rightThighAngle,
+            legPhase: this.player.legPhase
         };
         // Camera setup
         this.camera.follow(this.player);
@@ -62,44 +68,57 @@ export class Game {
         // Bullets in game
         this.bullets = [];
         // Gun sounds
-        this.shootSound = new Audio('/snd_weapon_14.mp3');
+        this.shootSound = new Audio('/snd_weapon_64.mp3');
         this.shootSound.volume = 0.05; // Set volume (0.0 to 1.0)
 
+        this.setupSocketListeners();
+
+        this.setupEventListeners();
+
+        this.directionVector = new DirectionVector(this.backgroundCanvas, {
+            strokeColor: 'blue',   // Kolor linii
+            fillColor: 'blue',     // Kolor grotu
+            lineWidth: 3,          // Grubość linii
+            arrowLength: 60,       // Długość strzałki
+            arrowSize: 12          // Rozmiar grotu
+        });
+    }
+
+    setupSocketListeners() {
         socket.on('player_health_update', (data: {
             playerId: string,
-            health: number,
-            isAlive: boolean
+            health: number
         }) => {
             if (data.playerId === this.player.id) {
                 this.player.health = data.health;
-                this.player.isAlive = data.isAlive;
             } else if (otherPlayers[data.playerId]) {
                 otherPlayers[data.playerId].health = data.health;
-                otherPlayers[data.playerId].isAlive = data.isAlive;
             }
         });
 
-        socket.on('player_respawned', (data: {
-            playerId: string,
-            x: number,
-            y: number,
-            health: number,
-            isAlive: boolean,
-            legSwingDirection: number,
-            thighSwingAngle: number,
-            calfSwingAngle: number,
-            headHitbox: any,
-            torsoHitbox: any,
-            legHitbox: any
-        }) => {
+        socket.on('player_move', (data) => {
+            if (otherPlayers[data.id]) {
+                otherPlayers[data.id].x = data.x;
+                otherPlayers[data.id].y = data.y;
+            }
+        }); 
+
+        socket.on('player_mouse_move', (data) => {
+            if (otherPlayers[data.id]) {
+                otherPlayers[data.id].mouseX = data.handX;
+                otherPlayers[data.id].mouseY = data.handY;
+            }
+        });
+
+        socket.on('player_respawned', (data) => {
             if (data.playerId === this.player.id) {
                 this.player.health = data.health;
                 this.player.isAlive = data.isAlive;
                 this.player.x = data.x;
                 this.player.y = data.y;
-                // this.player.legSwingDirection = data.legSwingDirection;
-                // this.player.thighSwingAngle = data.thighSwingAngle;
-                // this.player.calfSwingAngle = data.calfSwingAngle;
+                this.player.leftThighAngle = data.leftThighAngle,
+                this.player.rightThighAngle = data.rightThighAngle,
+                this.player.legPhase = data.legPhase,
                 this.player.headHitbox = data.headHitbox;
                 this.player.torsoHitbox = data.torsoHitbox;
                 this.player.legHitbox = data.legHitbox;
@@ -108,35 +127,40 @@ export class Game {
                 otherPlayers[data.playerId].isAlive = data.isAlive;
                 otherPlayers[data.playerId].x = data.x;
                 otherPlayers[data.playerId].y = data.y;
-                // otherPlayers[data.playerId].legSwingDirection = data.legSwingDirection;
-                // otherPlayers[data.playerId].thighSwingAngle = data.thighSwingAngle;
-                // otherPlayers[data.playerId].calfSwingAngle = data.calfSwingAngle;
+                otherPlayers[data.playerId].leftThighAngle = data.leftThighAngle;
+                otherPlayers[data.playerId].rightThighAngle = data.rightThighAngle;
+                otherPlayers[data.playerId].legPhase = data.legPhase;
                 otherPlayers[data.playerId].headHitbox = data.headHitbox;
                 otherPlayers[data.playerId].torsoHitbox = data.torsoHitbox;
                 otherPlayers[data.playerId].legHitbox = data.legHitbox;
-                
             }
         });
     
         socket.on('current_players', (players) => {
             for (let id in players) {
                 if (id === socket.id) {
-                    this.player = new Player(id, players[id].x, players[id].y, this.camera);
+                    // Aktualizuj dane lokalnego gracza, w tym id i playerName
+                    this.player.id = id; // Ustaw ID z serwera
+                    this.player.playerName = players[id].playerName; // Ustaw nazwę z serwera
+                    this.player.x = players[id].x;
+                    this.player.y = players[id].y;
                     this.player.mouseX = players[id].handX;
                     this.player.mouseY = players[id].handY;
-                    // this.player.legSwingDirection = players[id].legSwingDirection;
-                    // this.player.thighSwingAngle = players[id].thighSwingAngle;
-                    // this.player.calfSwingAngle = players[id].calfSwingAngle;
                     this.player.headHitbox = players[id].headHitbox;
                     this.player.torsoHitbox = players[id].torsoHitbox;
                     this.player.legHitbox = players[id].legHitbox;
+                    this.camera.follow(this.player); // Opcjonalne
                 } else {
-                    otherPlayers[id] = new Player(id, players[id].x, players[id].y, this.camera);
+                    // Twórz lub aktualizuj innych graczy
+                    if (!otherPlayers[id]) {
+                        otherPlayers[id] = new Player(socket, players[id].x, players[id].y, this.camera);
+                    }
+                    otherPlayers[id].id = id;
+                    otherPlayers[id].playerName = players[id].playerName;
+                    otherPlayers[id].x = players[id].x;
+                    otherPlayers[id].y = players[id].y;
                     otherPlayers[id].mouseX = players[id].handX;
                     otherPlayers[id].mouseY = players[id].handY;
-                    // otherPlayers[id].legSwingDirection = players[id].legSwingDirection;
-                    // otherPlayers[id].thighSwingAngle = players[id].thighSwingAngle;
-                    // otherPlayers[id].calfSwingAngle = players[id].calfSwingAngle;
                     otherPlayers[id].headHitbox = players[id].headHitbox;
                     otherPlayers[id].torsoHitbox = players[id].torsoHitbox;
                     otherPlayers[id].legHitbox = players[id].legHitbox;
@@ -144,40 +168,27 @@ export class Game {
             }
         });
 
-        socket.on('new_player', (data: { id: string, x: number, y: number, handX: number, handY: number }) => {
-            if (data.id !== socket.id) {
-                otherPlayers[data.id] = new Player(data.id, data.x, data.y, this.camera);
-            }
-        });
-
-        socket.on('update_position', (data: { 
-            id: string, 
-            x: number, 
-            y: number, 
-            handX: number, 
-            handY: number,
-            legSwingDirection: number,
-            thighSwingAngle: number,
-            calfSwingAngle: number,
-            headHitbox: { x: number, y: number },
-            torsoHitbox: { x: number, y: number },
-            legHitbox: { x: number, y: number }
-        }) => {
+        socket.on('update_position', (data) => {
             if (data.id !== socket.id && otherPlayers[data.id]) {
                 const player = otherPlayers[data.id];
                 player.x = data.x;
                 player.y = data.y;
-                player.mouseX = data.handX;
-                player.mouseY = data.handY;
-                // player.legSwingDirection = data.legSwingDirection;
-                // player.thighSwingAngle = data.thighSwingAngle;
-                // player.calfSwingAngle = data.calfSwingAngle;
+                player.leftThighAngle = data.leftThighAngle;
+                player.rightThighAngle = data.rightThighAngle;
+                player.legPhase = data.legPhase;
                 player.headHitbox.x = data.headHitbox.x;
                 player.headHitbox.y = data.headHitbox.y;
                 player.torsoHitbox.x = data.torsoHitbox.x;
                 player.torsoHitbox.y = data.torsoHitbox.y;
                 player.legHitbox.x = data.legHitbox.x;
                 player.legHitbox.y = data.legHitbox.y;
+            }
+        });
+
+        socket.on('update_mouse_position', (data) => {
+            if (data.id !== socket.id && otherPlayers[data.id]) {
+                otherPlayers[data.id].mouseX = data.handX;  // Absolutne współrzędne świata
+                otherPlayers[data.id].mouseY = data.handY;
             }
         });
 
@@ -207,18 +218,28 @@ export class Game {
             );
         });
 
-        socket.on('player_disconnected', (data: { id: string }) => {
-            delete otherPlayers[data.id];
+        socket.on('player_died', (data) => {
+            const { playerId, killerId, deathTime } = data;
+            if (playerId === this.player.id) {
+                // Lokalny gracz już obsłużony w handlePlayerDeath, ale upewniamy się
+                this.player.isAlive = false;
+                this.player.deathTime = deathTime;
+                this.player.killerId = killerId;
+                this.player.deathAnimation.active = true;
+                this.player.deathAnimation.progress = 0;
+            } else if (otherPlayers[playerId]) {
+                // Aktualizacja stanu innego gracza
+                const deadPlayer = otherPlayers[playerId];
+                deadPlayer.isAlive = false;
+                deadPlayer.deathTime = deathTime;
+                deadPlayer.killerId = killerId;
+                deadPlayer.deathAnimation.active = true;
+                deadPlayer.deathAnimation.progress = 0;
+            }
         });
 
-        this.setupEventListeners();
-
-        this.directionVector = new DirectionVector(this.backgroundCanvas, {
-            strokeColor: 'blue',   // Kolor linii
-            fillColor: 'blue',     // Kolor grotu
-            lineWidth: 3,          // Grubość linii
-            arrowLength: 60,       // Długość strzałki
-            arrowSize: 12          // Rozmiar grotu
+        socket.on('player_disconnected', (data: { id: string }) => {
+            delete otherPlayers[data.id];
         });
     }
 
@@ -253,13 +274,12 @@ export class Game {
             const scaleY = this.canvas.height / rect.height;
         
             // Przeskalowanie współrzędnych myszy względem canvasu
-            this.mouseX = (event.clientX - rect.left) * scaleX;
-            this.mouseY = (event.clientY - rect.top) * scaleY;
+            this.mouseX = Math.round((event.clientX - rect.left) * scaleX);
+            this.mouseY = Math.round((event.clientY - rect.top) * scaleY);
         
             // Aktualizuj pozycję ręki gracza
             this.player.mouseX = this.mouseX;
             this.player.mouseY = this.mouseY;
-
 
         });
 
@@ -270,31 +290,44 @@ export class Game {
     // Sprawdź, czy pozycja gracza się zmieniła i wyślij tylko wtedy
     checkAndEmitPosition() {
         if (!this.player.isAlive) return;
+
+        const positionChanged = this.player.x !== this.prevPlayerPosition.x || 
+                                this.player.y !== this.prevPlayerPosition.y;
+        const legsChanged = this.player.leftThighAngle !== this.prevPlayerPosition.leftThighAngle || 
+                            this.player.rightThighAngle !== this.prevPlayerPosition.rightThighAngle || 
+                            this.player.legPhase !== this.prevPlayerPosition.legPhase;
     
-        if (this.player.x !== this.prevPlayerPosition.x || 
-            this.player.y !== this.prevPlayerPosition.y || 
-            this.player.mouseX !== this.prevPlayerPosition.mouseX ||
-            this.player.mouseY !== this.prevPlayerPosition.mouseY ) {
-    
-            socket.emit('player_move', { 
+        if (positionChanged || legsChanged) {
+            socket.emit('player_move', {
                 x: this.player.x, 
                 y: this.player.y,
-                handX: this.mouseX,
-                handY: this.mouseY,
-                // legSwingDirection: this.player.legSwingDirection,
-                // thighSwingAngle: this.player.thighSwingAngle,
-                // calfSwingAngle: this.player.calfSwingAngle,
+                leftThighAngle: this.player.leftThighAngle,
+                rightThighAngle: this.player.rightThighAngle,
+                legPhase: this.player.legPhase,
                 headHitbox: { x: this.player.headHitbox.x, y: this.player.headHitbox.y },
                 torsoHitbox: { x: this.player.torsoHitbox.x, y: this.player.torsoHitbox.y },
                 legHitbox: { x: this.player.legHitbox.x, y: this.player.legHitbox.y }
             });
+            
+            // Aktualizuj poprzednie wartości
+            this.prevPlayerPosition.x = this.player.x;
+            this.prevPlayerPosition.y = this.player.y;
+            this.prevPlayerPosition.leftThighAngle = this.player.leftThighAngle;
+            this.prevPlayerPosition.rightThighAngle = this.player.rightThighAngle;
+            this.prevPlayerPosition.legPhase = this.player.legPhase;
+        }
     
-            this.prevPlayerPosition = { 
-                x: this.player.x, 
-                y: this.player.y,
-                mouseX: this.player.mouseX,
-                mouseY: this.player.mouseY
-            };
+        if (this.player.mouseX !== this.prevPlayerPosition.mouseX ||
+            this.player.mouseY !== this.prevPlayerPosition.mouseY) {
+            // Przelicz współrzędne myszy na współrzędne świata gry
+            const worldMouseX = this.player.mouseX + this.camera.xView;
+            const worldMouseY = this.player.mouseY + this.camera.yView;
+            socket.emit('player_mouse_move', {
+                handX: worldMouseX,
+                handY: worldMouseY    
+            });
+            this.prevPlayerPosition.mouseX = this.player.mouseX;
+            this.prevPlayerPosition.mouseY = this.player.mouseY;
         }
     }
 
@@ -310,7 +343,7 @@ export class Game {
         waitForImages();
     }
 
-    drawCollisionMap(ctx: CanvasRenderingContext2D) {
+    drawMap(ctx: CanvasRenderingContext2D) {
         ctx.strokeStyle = "red";
         ctx.lineWidth = 2;
         const scaleFactor = 3;
@@ -381,13 +414,11 @@ export class Game {
     handlePlayerHit(shooterId: string, damage: number = 10) {
         if (!this.player.isAlive) return;
     
-        // Próba zadania obrażeń z uwzględnieniem czasu niewrażliwości
         if (this.player.takeDamage(damage)) {
             // Wyślij aktualizację stanu zdrowia do innych graczy
             socket.emit('health_update', {
                 playerId: this.player.id,
-                health: this.player.health,
-                isAlive: this.player.isAlive
+                health: this.player.health
             });
     
             // Jeśli gracz zmarł
@@ -494,18 +525,20 @@ export class Game {
     }
 
     handlePlayerDeath(killerId: string) {
-        this.player.isAlive = false;
         this.player.deathTime = Date.now();
         this.player.killerId = killerId; // Ustawienie ID zabójcy
     
         socket.emit('player_death', {
             playerId: this.player.id,
-            killerId: killerId
+            killerId: killerId,
+            deathTime: this.player.deathTime
         });
     
         setTimeout(() => {
-            const respawnX = Math.random() * (this.canvas.width - this.player.width);
-            const respawnY = 300;
+            // const respawnX = Math.random() * (this.canvas.width - this.player.width);
+            const safePosition = this.findSafeRespawnPosition();
+            const respawnX = safePosition.x;
+            const respawnY = safePosition.y;
             
             this.player.respawn(respawnX, respawnY);
             
@@ -513,14 +546,43 @@ export class Game {
                 playerId: this.player.id,
                 x: respawnX,
                 y: respawnY,
-                legSwingDirection: 0,
-                thighSwingAngle: 0,
-                calfSwingAngle: 1,
+                leftThighAngle: 0,
+                rightThighAngle: 0,
+                legPhase: 0,
                 headHitbox: { x: respawnX, y: respawnY },
                 torsoHitbox: { x: respawnX, y: respawnY + 12 },
                 legHitbox: { x: respawnX, y: respawnY + 12 + 37 - 12 }
             });
         }, 5000);
+    }
+
+    findSafeRespawnPosition(): { x: number, y: number } {
+        const maxAttempts = 100; // Maksymalna liczba prób, aby uniknąć nieskończonej pętli
+        let attempts = 0;
+        let respawnX, respawnY;
+    
+        do {
+            // Losuj współrzędne w granicach backgroundCanvas
+            respawnX = Math.random() * (this.backgroundCanvas.width - this.player.width);
+            respawnY = Math.random() * (this.backgroundCanvas.height - this.player.height);
+    
+            // Twórz poligon gracza dla tych współrzędnych
+            const playerPolygon: Polygon = [
+                { x: respawnX, y: respawnY },
+                { x: respawnX + this.player.width, y: respawnY },
+                { x: respawnX + this.player.width, y: respawnY + this.player.height },
+                { x: respawnX, y: respawnY + this.player.height }
+            ];
+    
+            attempts++;
+            // Sprawdź, czy miejsce jest wolne od kolizji
+            if (!collisionChecker.checkPlayerCollision(playerPolygon)) {
+                return { x: respawnX, y: respawnY };
+            }
+        } while (attempts < maxAttempts);
+    
+        // Jeśli nie znaleziono miejsca, użyj domyślnego (bezpiecznego) punktu
+        return { x: 850, y: 300 };
     }
 
     drawContextLines() {
@@ -539,7 +601,7 @@ export class Game {
     }
 
     drawBackground(ctx: CanvasRenderingContext2D) {
-        this.drawCollisionMap(ctx);
+        this.drawMap(ctx);
 
         // Rysowanie tekstury mapy
 
@@ -591,6 +653,7 @@ export class Game {
         // Rysowanie pozostałych graczy
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.backgroundCtx);
+            // otherPlayers[id].updateHitboxes();
         }
 
         // Aktualizacja pocisków gracza oraz innych graczy
@@ -599,11 +662,6 @@ export class Game {
             bullet.draw(this.backgroundCtx);
         }
 
-        // Rysowanie ekranu śmierci oraz animacji
-        if (!this.player.isAlive) {
-            this.player.drawDeathAnimation(this.backgroundCtx);
-            this.player.drawDeathScreen(this.backgroundCtx);
-        }
         // this.drawForeground(this.backgroundCtx);
         this.drawContextLines();
     }
@@ -633,7 +691,11 @@ export class Game {
     update() {
         this.renderGame();
         this.renderCameraView();
-
+        // Rysowanie ekranu śmierci oraz animacji
+        if (!this.player.isAlive) {
+            this.player.drawDeathAnimation(this.backgroundCtx);
+            this.player.drawDeathScreen(this.ctx);
+        }
         // Pozycja kursora
         this.ctx.beginPath();
         this.ctx.arc(this.player.mouseX, this.player.mouseY, 5, 0, Math.PI * 2);

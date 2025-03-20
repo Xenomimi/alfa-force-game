@@ -1,8 +1,10 @@
+import { Socket } from "socket.io-client";
 import { Camera } from './camera';
 import CollisionChecker from './collisionChecker';
 
 export class Player {
     id: string;
+    socket: Socket;
     x: number;
     y: number;
     width: number;
@@ -37,7 +39,7 @@ export class Player {
     hand: HTMLImageElement;
     leg: HTMLImageElement;
 
-    // Animacja nóg
+    // Animacja nógaw
     leftThighAngle: number;  // Kąt dla lewego uda
     rightThighAngle: number; // Kąt dla prawego uda
     legSwingSpeed: number;   // Szybkość animacji
@@ -49,11 +51,12 @@ export class Player {
 
     imagesLoaded: boolean = false;
 
-    constructor(id: string, x: number, y: number, camera: Camera) {
-        this.id = id;
+    constructor(socket: Socket, x: number, y: number, camera: Camera) {
+        this.socket = socket;
+        this.id = socket.id ?? "unknown";
         this.x = x;
         this.y = y;
-        this.playerName = id;
+        this.playerName = this.id;
         this.color = 'rgb(255, 0, 0, 0.5)';
         this.speed = 4;
         this.gravity = 0.19;
@@ -190,28 +193,30 @@ export class Player {
             ctx.scale(-1, 1); // Odwróć poziomo
             ctx.translate(-this.x - this.width / 2, 0); // Cofnij przesunięcie
         }
+
         // Rysuj zbiorczy hitbox (czerwony prostokąt) wokół całej postaci
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 1;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
     
         // Rysuj nogi
-        // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.thighSwingAngle, this.calfSwingAngle);
-        // this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, -this.thighSwingAngle, this.calfSwingAngle);
         this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.leftThighAngle, 'orange');
         this.drawLeg(ctx, this.legHitbox.x, this.legHitbox.y, this.rightThighAngle, 'green');
-
-        // Rysuj tors i głowę
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.legHitbox.x, this.legHitbox.y, this.leg.width, this.leg.height);
+        
+        // Rysuj tors
         // ctx.drawImage(this.torso, this.torsoHitbox.x, this.torsoHitbox.y);
         ctx.strokeStyle = 'blue';
         ctx.lineWidth = 2;
-        ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torsoHitbox.width, this.torsoHitbox.height);
+        ctx.strokeRect(this.torsoHitbox.x, this.torsoHitbox.y, this.torso.width, this.torso.height);
         
+        // Rysuj głowe
         // ctx.drawImage(this.head, this.headHitbox.x, this.headHitbox.y);
         ctx.strokeStyle = 'blue';
         ctx.lineWidth = 2;
         ctx.strokeRect(this.headHitbox.x, this.headHitbox.y, this.head.width, this.head.height);
-    
         // Rysuj rękę z bronią
         this.drawHand(ctx, this.mouseX, this.mouseY, flipLeft, this.camera);
 
@@ -223,55 +228,6 @@ export class Player {
     
         ctx.restore();
     }
-
-    // Rysowanie nogi z ugięciem w kolanie
-    // drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number) {
-    //     ctx.save();
-    //     ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
-    //     ctx.rotate(thighAngle); // Obrót uda (joint)
-
-    //     // Rysuj udo (joint)
-    //     ctx.drawImage(this.joint, -this.joint.width / 2, -5);
-
-    //     // Przejdź do końca uda i rysuj podudzie (leg) z dodatkowym kątem dla zgięcia kolana
-    //     ctx.translate(3, this.joint.height / 3);
-    //     ctx.rotate(calfAngle); // Zgięcie w kolanie
-    //     ctx.drawImage(this.leg, -this.leg.width / 2, 0);
-
-    //     ctx.restore();
-    // }
-
-    // drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, calfAngle: number, color: string) {
-    //     ctx.save();
-    //     ctx.translate(x, y); // Punkt zaczepienia nogi na wysokości bioder
-        
-    //     // Dodanie kąta 90 stopni (π/2) do orientacji nóg
-    //     const offsetAngle = Math.PI / 2;
-    
-    //     // Rysowanie uda
-    //     const thighLength = 15; // Długość uda
-    //     const calfLength = 15;  // Długość podudzia
-    //     const kneeX = Math.cos(thighAngle + offsetAngle) * thighLength;
-    //     const kneeY = Math.sin(thighAngle + offsetAngle) * thighLength;
-    
-    //     ctx.strokeStyle = color;
-    //     ctx.lineWidth = 2;
-    //     ctx.beginPath();
-    //     ctx.moveTo(0, 0); // Punkt początkowy uda (biodro)
-    //     ctx.lineTo(kneeX, kneeY); // Koniec uda (kolano)
-    //     ctx.stroke();
-    
-    //     // Rysowanie podudzia
-    //     const footX = kneeX + Math.cos(thighAngle + calfAngle + offsetAngle) * calfLength;
-    //     const footY = kneeY + Math.sin(thighAngle + calfAngle + offsetAngle) * calfLength;
-    
-    //     ctx.beginPath();
-    //     ctx.moveTo(kneeX, kneeY); // Punkt początkowy podudzia (kolano)
-    //     ctx.lineTo(footX, footY); // Koniec podudzia (stopa)
-    //     ctx.stroke();
-    
-    //     ctx.restore();
-    // }
 
     drawLeg(ctx: CanvasRenderingContext2D, x: number, y: number, thighAngle: number, color: string) {
         ctx.save();
@@ -331,8 +287,17 @@ export class Player {
     }
 
     drawHand(ctx: CanvasRenderingContext2D, rawMouseX: number, rawMouseY: number, isFlipped: boolean, camera: Camera) {
-        const adjustedMouseX = rawMouseX + camera.xView;
-        const adjustedMouseY = rawMouseY + camera.yView;
+        let adjustedMouseX, adjustedMouseY;
+        
+        // Jeśli to lokalny gracz (id jest zgodne z socket.id), dostosuj pozycję myszy do kamery
+        if (this.socket.id === undefined || this.id === this.socket.id) {
+            adjustedMouseX = rawMouseX + camera.xView;
+            adjustedMouseY = rawMouseY + camera.yView;
+        } else {
+            // Dla innych graczy mouseX i mouseY są już współrzędnymi świata gry
+            adjustedMouseX = rawMouseX;
+            adjustedMouseY = rawMouseY;
+        }
         
         const upperArmLength = 15;
         const forearmLength = 15;
@@ -517,20 +482,24 @@ export class Player {
 
     drawDeathScreen(ctx: CanvasRenderingContext2D) {
         if (!this.isAlive && this.deathTime) {
+            // Tło ekranu śmierci
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     
+            // Tekst "You Died!"
             ctx.fillStyle = 'white';
             ctx.font = 'bold 48px Arial';
             ctx.textAlign = 'center';
             ctx.fillText('You Died!', ctx.canvas.width / 2, ctx.canvas.height / 2 - 50);
     
+            // Licznik odrodzenia
             const timeLeft = Math.max(0, Math.ceil((this.deathTime + 5000 - Date.now()) / 1000));
             if (timeLeft > 0) {
                 ctx.font = '24px Arial';
                 ctx.fillText(`Respawning in ${timeLeft} seconds...`, ctx.canvas.width / 2, ctx.canvas.height / 2 + 20);
             }
     
+            // Informacja o zabójcy
             if (this.killerId) {
                 ctx.font = '20px Arial';
                 ctx.fillText(`Killed by: Player ${this.killerId}`, ctx.canvas.width / 2, ctx.canvas.height / 2 + 60);
@@ -643,7 +612,7 @@ export class Player {
 
     isOnGround(collisionChecker: CollisionChecker): boolean {
         // Przesunięcie w dół o małą wartość, aby sprawdzić, czy poniżej gracza znajduje się podłoże
-        const offset = 1;
+        const offset = 2;
     
         // Tworzymy hitbox tuż pod graczem, aby sprawdzić, czy dotyka ziemi
         const groundCheckPolygon = [
