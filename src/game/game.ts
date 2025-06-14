@@ -31,8 +31,19 @@ export class Game {
     mouseX: number;
     mouseY: number;
     bullets: Bullet[];
+    private isRunning: boolean = false;
+    private animationFrameId: number | null = null;
     private shootSound: HTMLAudioElement;
     directionVector: DirectionVector;
+
+    // Dodaj referencje do funkcji handlera zdarzeń, aby móc je usunąć
+    private boundHandleMouseDown: (event: MouseEvent) => void;
+    private boundHandleMouseUp: (event: MouseEvent) => void;
+    private boundHandleMouseMove: (event: MouseEvent) => void;
+    private boundHandleKeyDown: (event: KeyboardEvent) => void;
+    private boundHandleKeyUp: (event: KeyboardEvent) => void;
+    private shootingInterval: NodeJS.Timeout | null = null;
+
     constructor(backgroundCanvas: HTMLCanvasElement, gameCanvas: HTMLCanvasElement) {
         // Canvas init
         this.canvas = gameCanvas;
@@ -73,6 +84,13 @@ export class Game {
 
         this.setupSocketListeners();
 
+        // Przypisz funkcje handlera do właściwości klasy
+        this.boundHandleMouseDown = this.handleMouseDown.bind(this);
+        this.boundHandleMouseUp = this.handleMouseUp.bind(this);
+        this.boundHandleMouseMove = this.handleMouseMove.bind(this);
+        this.boundHandleKeyDown = this.handleKeyDown.bind(this);
+        this.boundHandleKeyUp = this.handleKeyUp.bind(this);
+
         this.setupEventListeners();
 
         this.directionVector = new DirectionVector(this.backgroundCanvas, {
@@ -83,6 +101,125 @@ export class Game {
             arrowSize: 12          // Rozmiar grotu
         });
     }
+
+    // Zmodyfikowane funkcje handlera, aby były metodami klasy
+    private handleKeyDown(event: KeyboardEvent) {
+        if (!this.player.isAlive) return;
+        keysPressed[event.key] = true;
+        if (event.key === 'w') {
+            this.player.jump(collisionChecker);
+        }
+        if (event.key === 't') {
+            const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1");
+            console.log(collisionLayer?.objects);
+        }
+    }
+
+    private handleKeyUp(event: KeyboardEvent) {
+        if (!this.player.isAlive) return;
+        keysPressed[event.key] = false;
+    }
+
+    private handleMouseMove(event: MouseEvent) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        this.mouseX = Math.round((event.clientX - rect.left) * scaleX);
+        this.mouseY = Math.round((event.clientY - rect.top) * scaleY);
+        this.player.mouseX = this.mouseX;
+        this.player.mouseY = this.mouseY;
+    }
+
+    private handleMouseDown() {
+        if (!this.player.isAlive) return;
+
+        const { handPos, targetX, targetY } = this.calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
+        const bullet = new Bullet(
+            handPos.x,
+            handPos.y,
+            targetX,
+            targetY,
+            this.player.id,
+            collisionChecker
+        );
+        this.bullets.push(bullet);
+
+        socket.emit('player_shoot', {
+            x: handPos.x,
+            y: handPos.y,
+            targetX: targetX,
+            targetY: targetY,
+            playerId: this.player.id
+        });
+
+        const shootSoundInstance = new Audio(this.shootSound.src);
+        shootSoundInstance.volume = this.shootSound.volume;
+        shootSoundInstance.play();
+
+        if (!this.shootingInterval) {
+            this.shootingInterval = setInterval(() => {
+                const { handPos, targetX, targetY } = this.calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
+                const bullet = new Bullet(
+                    handPos.x,
+                    handPos.y,
+                    targetX,
+                    targetY,
+                    this.player.id,
+                    collisionChecker
+                );
+                this.bullets.push(bullet);
+
+                socket.emit('player_shoot', {
+                    x: handPos.x,
+                    y: handPos.y,
+                    targetX: targetX,
+                    targetY: targetY,
+                    playerId: this.player.id
+                });
+
+                const shootSoundInstance = new Audio(this.shootSound.src);
+                shootSoundInstance.volume = this.shootSound.volume;
+                shootSoundInstance.play();
+            }, 100);
+        }
+    }
+
+    private handleMouseUp() {
+        if (this.shootingInterval) {
+            clearInterval(this.shootingInterval);
+            this.shootingInterval = null;
+        }
+    }
+    
+    // Ta funkcja jest teraz prywatną metodą, ponieważ jest używana tylko wewnętrznie
+    private calculateHandPositionAndDirection(player: Player, mouseX: number, mouseY: number, camera: Camera) {
+        const adjustedMouseX = mouseX + camera.xView;
+        const adjustedMouseY = mouseY + camera.yView;
+        const isFlipped = mouseX < (player.x - camera.xView + player.width / 2);
+        const shoulderX = isFlipped ? player.x + player.width - 5 : player.x + 5;
+        const shoulderY = player.y + 16;
+
+        let dirX = adjustedMouseX - shoulderX;
+        let dirY = adjustedMouseY - shoulderY;
+        const length = Math.sqrt(dirX * dirX + dirY * dirY);
+        if (length > 0) {
+            dirX = dirX / length;
+            dirY = dirY / length;
+        }
+
+        const upperArmLength = 15;
+        const forearmLength = 15;
+        const elbowX = shoulderX + dirX * upperArmLength;
+        const elbowY = shoulderY + dirY * upperArmLength;
+        const handX = elbowX + dirX * forearmLength;
+        const handY = elbowY + dirY * forearmLength;
+
+        const targetDistance = 1000;
+        const targetX = handX + dirX * targetDistance;
+        const targetY = handY + dirY * targetDistance;
+
+        return { handPos: { x: handX, y: handY }, targetX, targetY };
+    };
 
     setupSocketListeners() {
         socket.on('player_health_update', (data: {
@@ -244,47 +381,25 @@ export class Game {
     }
 
     setupEventListeners() {
-        document.addEventListener('keydown', (event) => {
+        document.addEventListener('keydown', this.boundHandleKeyDown);
+        document.addEventListener('keyup', this.boundHandleKeyUp);
+        document.addEventListener('mousemove', this.boundHandleMouseMove);
+        document.addEventListener('mousedown', this.boundHandleMouseDown);
+        document.addEventListener('mouseup', this.boundHandleMouseUp);
+    }
 
-            if (!this.player.isAlive) return;
-
-            keysPressed[event.key] = true;
-
-            if (event.key === 'w') {
-                this.player.jump(collisionChecker);
-            }
-            if (event.key === 't') {
-                const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1");
-                console.log(collisionLayer?.objects);
-            }
-        });
-
-        document.addEventListener('keyup', (event) => {
-
-            if (!this.player.isAlive) return;
-
-            keysPressed[event.key] = false;
-        });
-
-        document.addEventListener('mousemove', (event) => {
-            const rect = this.canvas.getBoundingClientRect();
-            
-            // Skalowanie w osi X i Y
-            const scaleX = this.canvas.width / rect.width;
-            const scaleY = this.canvas.height / rect.height;
-        
-            // Przeskalowanie współrzędnych myszy względem canvasu
-            this.mouseX = Math.round((event.clientX - rect.left) * scaleX);
-            this.mouseY = Math.round((event.clientY - rect.top) * scaleY);
-        
-            // Aktualizuj pozycję ręki gracza
-            this.player.mouseX = this.mouseX;
-            this.player.mouseY = this.mouseY;
-
-        });
-
-        // Logika strzelania
-        this.handlePlayerShooting()
+    // Nowa metoda do usuwania słuchaczy zdarzeń
+    removeEventListeners() {
+        document.removeEventListener('keydown', this.boundHandleKeyDown);
+        document.removeEventListener('keyup', this.boundHandleKeyUp);
+        document.removeEventListener('mousemove', this.boundHandleMouseMove);
+        document.removeEventListener('mousedown', this.boundHandleMouseDown);
+        document.removeEventListener('mouseup', this.boundHandleMouseUp);
+        // Upewnij się, że interwał strzelania jest wyczyszczony
+        if (this.shootingInterval) {
+            clearInterval(this.shootingInterval);
+            this.shootingInterval = null;
+        }
     }
 
     // Sprawdź, czy pozycja gracza się zmieniła i wyślij tylko wtedy
@@ -332,15 +447,26 @@ export class Game {
     }
 
     start() {
-        // Wait until player's images are loaded
+        this.isRunning = true;
         const waitForImages = () => {
+            if (!this.isRunning) return;
             if (this.player.imagesLoaded) {
                 this.update();
             } else {
-                requestAnimationFrame(waitForImages);
+                this.animationFrameId = requestAnimationFrame(waitForImages);
             }
         };
         waitForImages();
+    }
+
+    stop() {
+        this.isRunning = false;
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        this.removeEventListeners(); // Dodaj to, aby usunąć słuchaczy
+        socket.disconnect(); // Rozłącz gniazdo
     }
 
     drawMap(ctx: CanvasRenderingContext2D) {
@@ -428,101 +554,7 @@ export class Game {
         }
     }
 
-    handlePlayerShooting() {
-        let shootingInterval: NodeJS.Timeout | null = null;
-    
-        const calculateHandPositionAndDirection = (player: Player, mouseX: number, mouseY: number, camera: Camera) => {
-            const adjustedMouseX = mouseX + camera.xView;
-            const adjustedMouseY = mouseY + camera.yView;
-            const isFlipped = mouseX < (player.x - camera.xView + player.width / 2);
-            const shoulderX = isFlipped ? player.x + player.width - 5 : player.x + 5;
-            const shoulderY = player.y + 16;
-    
-            let dirX = adjustedMouseX - shoulderX;
-            let dirY = adjustedMouseY - shoulderY;
-            const length = Math.sqrt(dirX * dirX + dirY * dirY);
-            if (length > 0) {
-                dirX = dirX / length;
-                dirY = dirY / length;
-            }
-    
-            const upperArmLength = 15;
-            const forearmLength = 15;
-            const elbowX = shoulderX + dirX * upperArmLength;
-            const elbowY = shoulderY + dirY * upperArmLength;
-            const handX = elbowX + dirX * forearmLength;
-            const handY = elbowY + dirY * forearmLength;
-    
-            const targetDistance = 1000;
-            const targetX = handX + dirX * targetDistance;
-            const targetY = handY + dirY * targetDistance;
-    
-            return { handPos: { x: handX, y: handY }, targetX, targetY };
-        };
-    
-        document.addEventListener('mousedown', () => {
-            if (!this.player.isAlive) return;
-    
-            const { handPos, targetX, targetY } = calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
-    
-            const bullet = new Bullet(
-                handPos.x,
-                handPos.y,
-                targetX,
-                targetY,
-                this.player.id,
-                collisionChecker
-            );
-            this.bullets.push(bullet);
-    
-            socket.emit('player_shoot', {
-                x: handPos.x,
-                y: handPos.y,
-                targetX: targetX,
-                targetY: targetY,
-                playerId: this.player.id
-            });
-    
-            const shootSoundInstance = new Audio(this.shootSound.src);
-            shootSoundInstance.volume = this.shootSound.volume;
-            shootSoundInstance.play();
-    
-            if (!shootingInterval) {
-                shootingInterval = setInterval(() => {
-                    const { handPos, targetX, targetY } = calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
-    
-                    const bullet = new Bullet(
-                        handPos.x,
-                        handPos.y,
-                        targetX,
-                        targetY,
-                        this.player.id,
-                        collisionChecker
-                    );
-                    this.bullets.push(bullet);
-    
-                    socket.emit('player_shoot', {
-                        x: handPos.x,
-                        y: handPos.y,
-                        targetX: targetX,
-                        targetY: targetY,
-                        playerId: this.player.id
-                    });
-    
-                    const shootSoundInstance = new Audio(this.shootSound.src);
-                    shootSoundInstance.volume = this.shootSound.volume;
-                    shootSoundInstance.play();
-                }, 100);
-            }
-        });
-    
-        document.addEventListener('mouseup', () => {
-            if (shootingInterval) {
-                clearInterval(shootingInterval);
-                shootingInterval = null;
-            }
-        });
-    }
+    // Usunięto handlePlayerShooting, ponieważ jego logika została przeniesiona do handleMouseDown i handleMouseUp
 
     handlePlayerDeath(killerId: string) {
         this.player.deathTime = Date.now();
@@ -625,44 +657,21 @@ export class Game {
     }
 
     renderGame() {
-        // Czyszczenie poprzedniej instacji gry
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Rysowanie mapy
         this.drawBackground(this.backgroundCtx);
-
-        // this.drawCollisionMap(this.backgroundCtx);
-        //Bloku ruch gracza jeżeli jest martwy
-        
-        // Rysowanie gracza
         this.player.draw(this.backgroundCtx);
-        
-    //     this.directionVector.draw(
-    //         this.player.getShoulderPosition().x,
-    //         this.player.getShoulderPosition().y,
-    //         this.player.getHandPosition().x,
-    //         this.player.getHandPosition().y,
-    // );
-
-        // Update pozycji gracza i kamera
         if (this.player.isAlive) {
             this.player.move(keysPressed, collisionChecker);
             this.camera.update({x: this.mouseX, y: this.mouseY});
         }
-
-        // Rysowanie pozostałych graczy
         for (let id in otherPlayers) {
             otherPlayers[id].draw(this.backgroundCtx);
             // otherPlayers[id].updateHitboxes();
         }
-
-        // Aktualizacja pocisków gracza oraz innych graczy
         this.updateBullets();
         for (const bullet of this.bullets) {
             bullet.draw(this.backgroundCtx);
         }
-
-        // this.drawForeground(this.backgroundCtx);
         this.drawContextLines();
     }
     
@@ -689,14 +698,16 @@ export class Game {
     }
 
     update() {
+        if (!this.isRunning) return;
+
         this.renderGame();
         this.renderCameraView();
-        // Rysowanie ekranu śmierci oraz animacji
+
         if (!this.player.isAlive) {
             this.player.drawDeathAnimation(this.backgroundCtx);
             this.player.drawDeathScreen(this.ctx);
         }
-        // Pozycja kursora
+
         this.ctx.beginPath();
         this.ctx.arc(this.player.mouseX, this.player.mouseY, 5, 0, Math.PI * 2);
         this.ctx.fillStyle = 'red';
@@ -704,6 +715,6 @@ export class Game {
         this.ctx.closePath();
 
         this.checkAndEmitPosition();
-        requestAnimationFrame(() => this.update());
+        this.animationFrameId = requestAnimationFrame(() => this.update());
     }
 }

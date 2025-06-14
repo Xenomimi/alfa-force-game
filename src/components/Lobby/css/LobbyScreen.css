@@ -1,0 +1,309 @@
+    /* Podstawowe style i zmienne kolorów */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    :root {
+      --bg-dark-primary: #121212;
+      --bg-dark-secondary: #1E1E1E;
+      --bg-dark-tertiary: #2C2F33;
+      --text-primary: #FFFFFF;
+      --text-secondary: #B0B0B0;
+      --text-tertiary: #7F8C8D;
+      --accent-orange: #e67e22;
+      --accent-orange-hover: #d35400;
+      --accent-green: #2ecc71;
+      --accent-green-hover: #27ae60;
+      --accent-red: #e74c3c;
+      --accent-red-hover: #c0392b;
+      --border-color: #4F545C;
+      --gradient-promo: linear-gradient(90deg, #ff8a00, #e52e71);
+    }
+
+    .lobby-body, .lobby-html {
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--bg-dark-primary);
+      color: var(--text-primary);
+      overflow: hidden; /* Zapobiega przewijaniu całej strony */
+    }
+
+    .lobby-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--bg-dark-primary);
+      color: var(--text-primary);
+    }
+
+    /* Główny layout */
+    .lobby-main {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 20px;
+      padding: 20px;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+
+    .left-sidebar, .main-content, .right-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto; /* Umożliwia przewijanie wewnątrz kolumn */
+    }
+
+    /* Ukrywanie paska przewijania */
+    .left-sidebar::-webkit-scrollbar, .main-content::-webkit-scrollbar, .right-sidebar::-webkit-scrollbar {
+        width: 0;
+        background: transparent;
+    }
+
+
+    .sidebar-section {
+      background-color: var(--bg-dark-secondary);
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    .sidebar-section > h2 {
+        font-size: 20px;
+        margin-bottom: 15px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .section-header h2, .section-header h3 {
+        font-size: 14px;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        margin: 0;
+    }
+    .section-header a, .section-header span {
+        font-size: 12px;
+        color: var(--text-tertiary);
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .section-header a:hover, .section-header span:hover {
+        color: var(--text-primary);
+    }
+
+
+    /* Lewy panel */
+    .action-btn {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 2px solid var(--border-color);
+      background-color: var(--bg-dark-tertiary);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: left;
+      transition: background-color 0.2s;
+    }
+    .action-btn:last-child {
+        margin-bottom: 0;
+    }
+
+    .action-btn.quick-play {
+      background-color: var(--accent-orange);
+      border-color: var(--accent-orange);
+    }
+    .action-btn.quick-play:hover {
+      background-color: var(--accent-orange-hover);
+      border-color: var(--accent-orange-hover);
+    }
+
+
+    .action-btn:hover {
+      border-color: var(--text-secondary);
+    }
+
+    .game-modes, .activity-feed {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .game-modes li {
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      font-weight: 500;
+    }
+
+    .game-modes li.active {
+      background-color: var(--bg-dark-tertiary);
+    }
+    .game-modes li:not(.active):hover {
+      background-color: var(--border-color);
+    }
+
+    .activity-feed li {
+        font-size: 14px;
+        padding: 8px 0;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .activity-icon {
+        font-size: 18px;
+    }
+
+    /* Główna treść */
+    .promo-banner {
+      background: var(--gradient-promo);
+      border-radius: 8px;
+      padding: 25px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .promo-text p {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .promo-text h2 {
+      margin: 5px 0 0 0;
+      font-size: 28px;
+      letter-spacing: 1px;
+    }
+
+    .play-now-btn {
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      color: #000;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 5px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .play-now-btn:hover {
+        background: rgba(255, 255, 255, 1);
+    }
+
+    .active-games-section {
+        background-color: var(--bg-dark-secondary);
+        padding: 20px;
+        border-radius: 8px;
+        flex-grow: 1;
+    }
+
+    .games-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .game-item {
+      display: grid;
+      grid-template-columns: 1fr 120px 80px 60px auto;
+      align-items: center;
+      background-color: var(--bg-dark-tertiary);
+      padding: 15px;
+      border-radius: 5px;
+      border-left: 3px solid transparent;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+    .game-item:hover {
+        background-color: #3C4045;
+        border-left-color: var(--accent-orange);
+    }
+
+    .game-item span {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .game-item .map-name {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .ping {
+      color: var(--accent-green);
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .join-btn {
+        background-color: var(--accent-green);
+        color: white;
+        border: none;
+        margin-left: 10px;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        justify-self: end;
+        transition: background-color 0.2s;
+    }
+    .join-btn:hover {
+        background-color: var(--accent-green-hover);
+    }
+
+    /* Prawy panel */
+    .right-sidebar .map-preview {
+        background-color: var(--bg-dark-secondary);
+        padding: 20px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .map-preview h3 {
+        margin-top: 0;
+    }
+
+    .map-preview .map-image-placeholder {
+        width: 100%;
+        height: 180px;
+        background-color: var(--bg-dark-tertiary);
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 15px 0;
+        color: var(--text-tertiary);
+        border: 1px dashed var(--border-color);
+    }
+
+    .map-preview .change-map-btn {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        background-color: var(--bg-dark-tertiary);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: bold;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .map-preview .change-map-btn:hover {
+        border-color: var(--text-secondary);
+    }

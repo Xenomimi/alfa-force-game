@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+  --bg-dark-primary: #121212;
+  --bg-dark-secondary: #1E1E1E;
+  --bg-dark-tertiary: #2C2F33;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0B0B0;
+  --text-tertiary: #7F8C8D;
+  --accent-orange: #e67e22;
+  --accent-orange-hover: #d35400;
+  --accent-green: #2ecc71;
+  --accent-green-hover: #27ae60;
+  --accent-red: #e74c3c;
+  --accent-red-hover: #c0392b;
+  --border-color: #4F545C;
+  --gradient-promo: linear-gradient(90deg, #ff8a00, #e52e71);
+}
+
+/* -------- BAZOWE ZMIENNE kolorów pozostawiamy bez zmian -------- */
+
+/* ► BELKA GÓRNA ◄ */
+.lobby-header{
+    display:flex;justify-content:space-between;align-items:center;
+    background-color: rgba(10, 10, 15, 1);
+    background-image: linear-gradient(90deg, rgba(10, 10, 15, 1) 0%, rgba(22, 27, 34, 1) 100%);
+    padding:12px 32px;
+    border-bottom:1px solid #30363d;
+    font-family:'Inter',sans-serif;
+}
+
+/* ▼ BADGE z ikoną + tekstem */
+.user-info{display:flex;align-items:center;gap:20px;}
+.user-badge{
+  display:flex;align-items:center;gap:6px;
+  background:#2c2f33;padding:6px 10px;border-radius:6px;
+  font-size:14px;font-weight:500;color:#f0f6fc;
+  box-shadow:inset 0 0 3px rgba(255,255,255,0.08);
+}
+
+/* Pasek exp w badge */
+.exp-wrapper{gap:8px;}
+.exp-bar{width:120px;height:6px;background:#30363d;border-radius:4px;overflow:hidden;}
+.exp-fill{background: #00D9FF;height:100%;border-radius:4px;}
+
+/* ▼ PRZYCISKI AKCJI */
+.header-actions{display:flex;align-items:center;gap:12px;}
+.icon-btn{
+  display:flex;align-items:center;justify-content:center;
+  background:#2c2f33;border:none;color:#b0b0b0;
+  padding:8px;border-radius:5px;cursor:pointer;transition:.2s;
+}
+.icon-btn:hover{background:#3a3f44;color:#fff;}
+
+.logout-btn{
+  display:flex;align-items:center;gap:6px;
+  background:#e94560;border:none;color:#fff;font-weight:600;
+  padding:8px 14px;border-radius:6px;cursor:pointer;transition:.2s;
+}
+.logout-btn:hover{background:#c0392b;}
+
+/* ► MENU NAV ◄ */
+/* ─────────────  NAVIGATION  ───────────── */
+.lobby-nav{
+  position:relative;                 /* dla belki */
+  display:flex;
+  align-items:center;
+  justify-content: space-around;
+  background:#1E1E1E;               /* ten sam co header */
+  height:54px;
+  padding:0 32px;
+  border-bottom:1px solid #30363d;
+}
+
+/* przycisk */
+.nav-btn{
+  position:relative;
+  font-size:15px;font-weight:500;
+  background:#2c2f33;border:none;border-radius:8px;
+  color:#b0b0b0;cursor:pointer;
+  padding:8px 20px;
+  transition: background .25s,color .25s;
+}
+.nav-btn:hover{background:#35393e;color:#fff;}
+.nav-btn.active{color:#fff;background:#35393e;}
+
+/* przesuwany czerwony pasek */
+.nav-bar-indicator{
+  position:absolute;bottom:0;left:0;height:3px;
+  background:#e94560;border-radius:2px;
+  transition: transform .35s cubic-bezier(.25,.8,.25,1), width .35s;
+  pointer-events:none;
+}
+

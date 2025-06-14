@@ -1,0 +1,159 @@
+/* Tło strony */
+.auth-container {
+  background-color: #0A0A0F;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#root {
+    width: 100%;
+}
+
+/* Karta logowania */
+.auth-form {
+  background-color: #161B22;
+  border-radius: 16px;
+  padding: 32px;
+  width: 360px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.4);
+  color: #F0F6FC;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Nagłówek */
+.auth-header {
+  text-align: center;
+}
+
+.auth-header .logo {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+
+.auth-header h1 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.auth-header p {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+}
+
+/* Pola formularza */
+.auth-form input[type="email"],
+.auth-form input[type="password"],
+.auth-form input[type="text"] {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #30363D;
+  background-color: #0A0A0F;
+  color: #F0F6FC;
+  font-size: 14px;
+}
+
+.auth-form input::placeholder {
+  color: #6c757d;
+}
+
+/* Zapamiętaj i link */
+.auth-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.auth-options a {
+  color: #00D9FF;
+  text-decoration: none;
+}
+
+/* Przyciski */
+.login-btn {
+  background: linear-gradient(90deg, #E94560, #F79824);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.register-btn {
+  background-color: transparent;
+  border: 1px solid #00D9FF;
+  color: #00D9FF;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #F0F6FC;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Separator "lub" */
+.separator {
+  text-align: center;
+  margin: 8px 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.separator span {
+  border-bottom: 1px solid #30363D;
+  padding-bottom: 4px;
+}
+
+/* Social login */
+.social-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.google-btn,
+.steam-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #30363D;
+  background-color: #0A0A0F;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.google-btn:hover,
+.steam-btn:hover {
+  background-color: #1a1a1a;
+}
+
+/* Kontakt */
+.contact-info {
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+}
+
+.contact-info a {
+  color: #00D9FF;
+  text-decoration: none;
+}
