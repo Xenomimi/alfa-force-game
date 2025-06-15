@@ -53,7 +53,7 @@ export class Player {
 
     constructor(socket: Socket, x: number, y: number, camera: Camera) {
         this.socket = socket;
-        this.id = socket.id ?? "unknown";
+        this.id = socket.id ?? "PlayerName";
         this.x = x;
         this.y = y;
         this.playerName = this.id;

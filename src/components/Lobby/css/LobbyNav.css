@@ -1,0 +1,34 @@
+/* ► MENU NAV ◄ */
+/* ─────────────  NAVIGATION  ───────────── */
+.lobby-nav{
+  position:relative;                 /* dla belki */
+  display:flex;
+  align-items:center;
+  justify-content: space-around;
+  background:#1E1E1E;               /* ten sam co header */
+  height:54px;
+  padding:0 32px;
+  border-bottom:1px solid #30363d;
+}
+
+/* przycisk */
+.nav-btn{
+  position:relative;
+  font-size:15px;
+  font-weight:500;
+  font-family: var(--font);
+  background:#2c2f33;border:none;border-radius:8px;
+  color:#b0b0b0;cursor:pointer;
+  padding:8px 20px;
+  transition: background .25s,color .25s;
+}
+.nav-btn:hover{background:#35393e;color:#fff;}
+.nav-btn.active{color:#fff;background:#35393e;}
+
+/* przesuwany czerwony pasek */
+.nav-bar-indicator{
+  position:absolute;bottom:0;left:0;height:3px;
+  background:#e94560;border-radius:2px;
+  transition: transform .35s cubic-bezier(.25,.8,.25,1), width .35s;
+  pointer-events:none;
+}

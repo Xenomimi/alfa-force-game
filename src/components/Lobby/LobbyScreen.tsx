@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import './css/LobbyScreen.css';
 import LobbyHeader from './LobbyHeader';
-import { CirclePlay } from 'lucide-react';
+import { CirclePlay, Play, Plus, Users
+  , Crosshair, Flag, Crown, Clock, Coins, Skull
+ } from 'lucide-react';
 import LobbyNav from './LobbyNav';
+import PlayerProfile  from '../Profile/PlayerProfile';
+import ShopScreen from '../Shop/ShopScreen';
+import LeadersScreen from '../Ranking/LeadersScreen';
+import Settings from '../Settings/Settings';
+
+export type Section = 'rozgrywki' | 'profil' | 'sklep' | 'liderzy' | 'ustawienia';
 
 interface LobbyScreenProps {
   onStartGame: () => void;
@@ -10,13 +18,12 @@ interface LobbyScreenProps {
 }
 
 const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame, onLogout }) => {
-  const [activeSection, setActiveSection] = useState<'rozgrywki' | 'profil' | 'sklep' | 'liderzy' | 'ustawienia'>('rozgrywki');
+  const [activeSection, setActiveSection] = useState('rozgrywki');
 
-  const handleNavigate = (section: string) => {
-    // Można tu w przyszłości przełączać widoki
-    setActiveSection(section as any);
-    console.log('Nawigacja do:', section);
-  };
+  const handleNavigate = (s: Section) => {
+    setActiveSection(s);
+    console.log(`Nawigacja do sekcji: ${s}`);
+  }
 
   const activeGames = [
     { name: 'Industrial Zone', mode: 'Deathmatch', players: '8/12', ping: '45ms' },
@@ -36,33 +43,84 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame, onLogout }) => {
     <div className="lobby-container">
       <LobbyHeader onLogout={onLogout}/>
       <LobbyNav active={activeSection} onNavigate={handleNavigate} />
+
+      {activeSection === 'profil' ? (
+        <PlayerProfile />
+      ) : activeSection === 'sklep' ? (
+        <ShopScreen />
+      ) : activeSection === 'liderzy' ? (
+        <LeadersScreen />
+      ) : activeSection === 'ustawienia' ? (
+        <Settings />
+      ) : (
+      
+
       <main className="lobby-main">
         <aside className="left-sidebar">
           <section className="sidebar-section">
             <h2>SZYBKIE AKCJE</h2>
-            <button className="action-btn quick-play" onClick={onStartGame}>▷ SZYBKA GRA</button>
-            <button className="action-btn create-room">+ STWÓRZ POKÓJ</button>
-            <button className="action-btn join-room">DOŁĄCZ DO GRY</button>
+            <button className="action-btn quick-play" onClick={onStartGame}><Play size={24}/> SZYBKA GRA</button>
+            <button className="action-btn create-room"><Plus size={24}/> STWÓRZ POKÓJ</button>
+            <button className="action-btn join-room"><Users size={24} color='#39FF14'/> DOŁĄCZ DO GRY</button>
           </section>
 
           <section className="sidebar-section">
             <h2>TRYBY GRY</h2>
+
             <ul className="game-modes">
-              <li className="active">Deathmatch</li>
-              <li>Team Deathmatch</li>
-              <li>King of the Hill</li>
+              <li className="active">
+                <span className="mode-icon"><Crosshair size={18}/></span>
+                <div className="mode-text">
+                  <span className="mode-title">Deathmatch</span>
+                  <span className="mode-desc">Klasyczna rozgrywka FFA</span>
+                </div>
+              </li>
+
+              <li>
+                <span className="mode-icon"><Flag size={18}/></span>
+                <div className="mode-text">
+                  <span className="mode-title">Team Deathmatch</span>
+                  <span className="mode-desc">Walka drużynowa</span>
+                </div>
+              </li>
+
+              <li>
+                <span className="mode-icon"><Crown size={18}/></span>
+                <div className="mode-text">
+                  <span className="mode-title">King of the Hill</span>
+                  <span className="mode-desc">Kontrola punktu</span>
+                </div>
+              </li>
             </ul>
           </section>
 
           <section className="sidebar-section">
             <h2>OSTATNIA AKTYWNOŚĆ</h2>
+
             <ul className="activity-feed">
-              {recentActivities.map((activity, index) => (
-                <li key={index}>
-                  <span className="activity-icon">{activity.icon}</span>
-                  {activity.text}
-                </li>
-              ))}
+              <li className="green">
+                <span className="act-icon"><Clock size={16}/></span>
+                <div className="act-text">
+                  <span className="act-title">Awans na poziom&nbsp;11</span>
+                  <span className="act-time">2&nbsp;minuty temu</span>
+                </div>
+              </li>
+
+              <li className="orange">
+                <span className="act-icon"><Coins size={16}/></span>
+                <div className="act-text">
+                  <span className="act-title">Zdobyto&nbsp;500 monet</span>
+                  <span className="act-time">15&nbsp;min temu</span>
+                </div>
+              </li>
+
+              <li className="red">
+                <span className="act-icon"><Skull size={16}/></span>
+                <div className="act-text">
+                  <span className="act-title">Pokonano 5 przeciwników</span>
+                  <span className="act-time">1 godzina temu</span>
+                </div>
+              </li>
             </ul>
           </section>
         </aside>
@@ -105,12 +163,13 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame, onLogout }) => {
           <div className="map-preview">
             <h3>Nazwa załączonej mapy</h3>
             <div className="map-image-placeholder">
-              <span>Zdjęcie mapy</span>
+              <img src="https://dummyimage.com/282x182/000/fff" alt="Map Preview" />
             </div>
             <button className="change-map-btn">Zmień mapę</button>
           </div>
         </aside>
       </main>
+      )}
     </div>
   );
 };

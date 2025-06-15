@@ -1,5 +1,5 @@
     /* Podstawowe style i zmienne kolorów */
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
     :root {
       --bg-dark-primary: #121212;
       --bg-dark-secondary: #1E1E1E;
@@ -13,14 +13,19 @@
       --accent-green-hover: #27ae60;
       --accent-red: #e74c3c;
       --accent-red-hover: #c0392b;
+      --accent-red-header: #E94560;
       --border-color: #4F545C;
-      --gradient-promo: linear-gradient(90deg, #ff8a00, #e52e71);
+      --accent-blue-header: #00D9FF;
+      --accent-green-header: #39FF14;
+      --gradient-promo: linear-gradient(to right top, #00d9ff, #F79824,#e94560);
+      --gradient-fast-game: linear-gradient(to right bottom, #E94560, #F79824);
+      --font: "Rajdhani", sans-serif;
     }
 
     .lobby-body, .lobby-html {
       margin: 0;
       padding: 0;
-      font-family: 'Roboto', sans-serif;
+      font-family: var(--font);
       background-color: var(--bg-dark-primary);
       color: var(--text-primary);
       overflow: hidden; /* Zapobiega przewijaniu całej strony */
@@ -31,7 +36,7 @@
       flex-direction: column;
       height: 100vh;
       width: 100%;
-      font-family: 'Roboto', sans-serif;
+      font-family: var(--font);
       background-color: var(--bg-dark-primary);
       color: var(--text-primary);
     }
@@ -69,6 +74,7 @@
     .sidebar-section > h2 {
         font-size: 20px;
         margin-bottom: 15px;
+        color: var(--accent-red-header);
     }
 
     .section-header {
@@ -104,29 +110,37 @@
       background-color: var(--bg-dark-tertiary);
       color: var(--text-primary);
       font-size: 14px;
-      font-weight: bold;
+      font-weight: 700;
+      font-family: var(--font);
       border-radius: 5px;
       cursor: pointer;
       text-align: left;
       transition: background-color 0.2s;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 20px;
+      align-items: center;
     }
     .action-btn:last-child {
         margin-bottom: 0;
     }
 
     .action-btn.quick-play {
-      background-color: var(--accent-orange);
-      border-color: var(--accent-orange);
-    }
-    .action-btn.quick-play:hover {
-      background-color: var(--accent-orange-hover);
-      border-color: var(--accent-orange-hover);
+      background: var(--gradient-fast-game);
+      border-color: var(--accent-red-header);
     }
 
-
-    .action-btn:hover {
-      border-color: var(--text-secondary);
+    .action-btn.create-room {
+      background: var(--bg-dark-tertiary);
+      border-color: var(--accent-blue-header);
+      color: var(--accent-blue-header);
     }
+
+    .action-btn.join-room {
+      background: var(--bg-dark-tertiary);
+      border-color: var(--accent-green-header);
+      color: var(--accent-green-header);
+}
 
     .game-modes, .activity-feed {
       list-style: none;
@@ -168,6 +182,7 @@
     .promo-banner {
       background: var(--gradient-promo);
       border-radius: 8px;
+      border: 2px solid var(--accent-red-header);
       padding: 25px 30px;
       display: flex;
       justify-content: space-between;
@@ -190,7 +205,8 @@
       background: rgba(255, 255, 255, 0.9);
       display: flex;
       align-items: center;
-      color: #000;
+      color: var(--accent-red-header);
+      font-family: var(--font);
       border: none;
       padding: 15px 30px;
       border-radius: 5px;
@@ -258,6 +274,7 @@
         border-radius: 5px;
         cursor: pointer;
         font-weight: bold;
+        font-family: var(--font);
         justify-self: end;
         transition: background-color 0.2s;
     }
@@ -289,7 +306,8 @@
         justify-content: center;
         margin: 15px 0;
         color: var(--text-tertiary);
-        border: 1px dashed var(--border-color);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
     }
 
     .map-preview .change-map-btn {
@@ -300,6 +318,7 @@
         color: var(--text-primary);
         font-size: 14px;
         font-weight: bold;
+        font-family: var(--font);
         border-radius: 5px;
         cursor: pointer;
         transition: background-color 0.2s;
@@ -307,3 +326,89 @@
     .map-preview .change-map-btn:hover {
         border-color: var(--text-secondary);
     }
+
+
+    /* ▬▬▬▬▬ SZYBKIE AKCJE – bez zmian w tym bloku ▬▬▬▬▬ */
+
+
+/* ══════════════════════════════════════════════════ */
+/* =================  TRYBY GRY  ==================== */
+
+.game-modes li{
+  display:grid;
+  grid-template-columns:36px 1fr;
+  gap:12px;
+  align-items:center;
+  background:var(--bg-dark-tertiary);
+  padding:12px 16px;
+  border:2px solid transparent;
+  border-radius:8px;
+  transition:background .15s, border-color .15s;
+}
+
+.game-modes li:not(.active):hover{
+  background:#3c4045;
+}
+
+/* obrys + subtelny cień przy aktywnym */
+.game-modes li.active{
+  border-color:var(--accent-orange);
+  box-shadow:0 0 6px #e67e2244;
+}
+
+.mode-icon{
+  width:36px; height:36px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:6px;
+  background:#26292e;
+  color:var(--accent-orange);
+}
+
+.mode-text{display:flex; flex-direction:column;}
+.mode-title{
+  font-size:14px; font-weight:700; color:var(--text-primary);
+}
+.mode-desc{
+  font-size:11px; color:var(--text-tertiary); margin-top:2px;
+}
+
+/* =================  OSTATNIA AKTYWNOŚĆ  ============ */
+
+.activity-feed li{
+  display:grid;
+  grid-template-columns:40px 1fr;
+  gap:12px;
+  align-items:center;
+  padding:12px 16px;
+  background:var(--bg-dark-tertiary);
+  border-radius:8px;
+  border-left:4px solid transparent;
+}
+
+.activity-feed li + li{ margin-top:10px; }
+
+.activity-feed li:hover{
+  background:#3c4045;
+}
+
+.act-icon{
+  width:36px; height:36px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  color:#fff;
+  /* tło kolorystyczne nadamy klasami .green / .orange / .red  */
+}
+
+.activity-feed li.green  .act-icon{ background:var(--accent-green);}
+.activity-feed li.orange .act-icon{ background:var(--accent-orange);}
+.activity-feed li.red    .act-icon{ background:var(--accent-red);}
+
+.act-text{display:flex; flex-direction:column;}
+.act-title{ font-size:14px; color:var(--text-primary); font-weight:500; }
+.act-time { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+
+
+/* bonus – mały gradient border na krawędzi (opcjonalne) */
+.activity-feed li.green { border-left-color:var(--accent-green);}
+.activity-feed li.orange{ border-left-color:var(--accent-orange);}
+.activity-feed li.red   { border-left-color:var(--accent-red);}

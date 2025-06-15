@@ -34,6 +34,7 @@ canvas {
   bottom: 20px;
   left: 20px;
   display: flex;
+  font-family: var(--font);
   gap: 20px;
   align-items: flex-end;
   pointer-events: auto;
@@ -52,7 +53,7 @@ canvas {
 
 .hud-weapon {
   background-color: var(--bg-dark-tertiary);
-  border: 2px solid #e94560;
+  border: 1px solid #e94560;
   padding: 12px 18px;
   border-radius: 6px;
   font-weight: 600;
@@ -92,3 +93,42 @@ canvas {
   font-weight: bold;
   color: white;
 }
+
+/* ▬▬▬▬▬  SCOREBOARD ▬▬▬▬▬ */
+@keyframes scoreboardIn {
+  from { opacity: 0; transform: translateY(40px) scale(.9); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+@keyframes scoreboardOut {
+  from { opacity: 1; transform: translateY(0)  scale(1); }
+  to   { opacity: 0; transform: translateY(40px) scale(.9); }
+}
+
+.scoreboard-overlay{
+  position:fixed; inset:0;
+
+  display:flex; align-items:center; justify-content:center;
+  z-index:15; pointer-events:none;
+  font-family: var(--font);
+}
+
+.scoreboard-wrapper{
+  overflow:auto;
+  animation: scoreboardIn .35s cubic-bezier(.25,.8,.3,1) forwards;
+  max-width: 650px;
+}
+
+.scoreboard-wrapper.hide{
+  animation: scoreboardOut .25s cubic-bezier(.55,.085,.68,.53) forwards;
+}
+
+
+
+.leader-table thead {
+  font-size: 14px;
+}
+
+
+
+
+

@@ -1,0 +1,182 @@
+/* ───────────────────────────────────────────
+   LeadersScreen.css  –  pełny plik
+   ─────────────────────────────────────────── */
+
+/* ========= Animacje ========= */
+
+@keyframes slideUpFadeIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bob {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-8px); }
+}
+
+/* ========= Root ========= */
+
+.leaders-root{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  overflow:hidden;
+  padding:20px;
+  background:var(--bg-dark-primary);
+}
+
+/* ▬▬▬▬▬▬▬ PODIUM ▬▬▬▬▬▬▬ */
+
+.podium{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+  padding:20px 0;
+  margin-bottom:26px;
+  place-items:end center;
+}
+
+.podium-slot{
+  position:relative;
+  text-align:center;
+  color:var(--text-primary);
+  animation:slideUpFadeIn .6s cubic-bezier(.25,.46,.45,.94) both;
+}
+.place-1{animation-delay:.2s;}
+.place-2{animation-delay:0s;}
+.place-3{animation-delay:.4s;}
+
+.avatar-wrap{
+  position:relative;
+  width:120px;height:120px;
+  border:4px solid;
+  border-radius:50%;
+  overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg-dark-tertiary);
+  margin:0 auto 10px;
+  box-shadow:0 4px 15px rgba(0,0,0,.3);
+}
+.avatar-wrap img{width:100%;height:100%;object-fit:cover;}
+
+.place-1 .avatar-wrap{width:140px;height:140px;border-color:#ffd700;box-shadow:0 0 20px #ffd70066;}
+.place-2 .avatar-wrap{border-color:#c0c0c0;}
+.place-3 .avatar-wrap{border-color:#cd7f32;}
+
+.podium-crown{
+  position:absolute;top:-25px;left:40%;
+  color:#ffd900;
+  animation:bob 3s ease-in-out infinite;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+  z-index:10;
+}
+
+.podium-place{
+  position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);
+  width:32px;height:32px;border-radius:50%;
+  background:var(--bg-dark-secondary);
+  font-weight:700;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  border:3px solid;
+}
+.place-1 .podium-place{border-color:#ffd700;}
+.place-2 .podium-place{border-color:#c0c0c0;}
+.place-3 .podium-place{border-color:#cd7f32;}
+
+.podium-name   {display:block;font-size:18px;font-weight:700;margin-top:8px;}
+.podium-reward {display:block;color:#39FF14;font-weight:600;font-size:15px;}
+.podium-points {display:block;font-size:13px;color:var(--text-secondary);}
+
+/* ▬▬▬▬▬▬▬ TABELA ▬▬▬▬▬▬▬ */
+
+.table-wrapper{
+  flex:1;
+  overflow:auto;
+  padding:20px;
+  background:var(--bg-dark-secondary);
+  border-radius:8px;
+}
+.table-wrapper::-webkit-scrollbar{width:6px;}
+.table-wrapper::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:3px;}
+
+.leader-table{
+  width:100%;
+  min-width:600px;
+  border-collapse:separate;         /* kluczowe! */
+  border-spacing:0 10px;            /* odstęp między wierszami */
+}
+
+/* Nagłówki */
+.leader-table thead{
+  font-size:12px;
+  color:var(--accent-red-header);
+  text-transform:uppercase;
+}
+.leader-table th,
+.leader-table td{
+  padding:16px 18px;
+  text-align:left;
+  vertical-align:middle;
+}
+
+/* Pojedynczy wiersz */
+.leader-table tbody tr{
+  background:var(--bg-dark-tertiary);
+  transition:background-color .25s;
+}
+/* Hover */
+.leader-table tbody tr:hover{background:#0A0A0F;}
+
+/* Zaokrąglone rogi */
+.leader-table tbody tr td:first-child{
+  border-top-left-radius:10px;
+  border-bottom-left-radius:10px;
+}
+.leader-table tbody tr td:last-child{
+  border-top-right-radius:10px;
+  border-bottom-right-radius:10px;
+}
+
+/* ── Podświetlenie zalogowanego gracza ── */
+.current-user-row {
+  box-shadow:inset 0 0 0 2px var(--accent-orange);
+  background:rgba(255,165,0,.08) !important;
+  border-radius: 10px;
+}
+.current-user-row td:first-child{
+  border-top-left-radius:10px;
+  border-bottom-left-radius:10px;
+}
+.current-user-row td:last-child{
+  border-top-right-radius:10px;
+  border-bottom-right-radius:10px;
+}
+
+/* ▬▬▬ Komórki ▬▬▬ */
+
+.cell-rank{
+  width:80px;
+  text-align:center;
+  font-weight:700;
+  font-size:16px;
+  color:var(--text-secondary);
+}
+
+.cell-player{
+  display:flex;align-items:center;gap:12px;
+  font-weight:500;
+}
+.cell-player img{
+  width:40px;height:40px;border-radius:50%;object-fit:cover;
+  border:2px solid var(--border-color);
+}
+.cell-player .img-first{
+  border-color:#ffd700;box-shadow:0 0 20px #ffd70066;
+}
+
+.cell-reward{color:#39FF14;font-weight:600;}
+.cell-points{font-weight:700;color:var(--text-primary);}
+
+/* Dodatkowe wyróżnienie 1-3 miejsca w tabeli (opcjonalne) */
+.top-row{font-weight:600;}
+.top-row td:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px;}
+.top-row td:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px;}

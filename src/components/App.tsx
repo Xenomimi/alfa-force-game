@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import LoginRegisterScreen from './LoginRegisterScreen.tsx';
 import LobbyScreen from './Lobby/LobbyScreen.tsx';
-import GameHUD from './GameHUD';
+import GameHUD from './Hud/GameHUD.tsx';
 import { Game } from '../game/game';
 import '../styles/style.css';
 
