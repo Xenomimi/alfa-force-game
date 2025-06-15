@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
 /* Tło strony */
 .auth-container {
   background-color: #0A0A0F;
@@ -20,6 +21,7 @@
   box-shadow: 0 0 20px rgba(0,0,0,0.4);
   color: #F0F6FC;
   display: flex;
+
   flex-direction: column;
   gap: 16px;
   font-family: 'Inter', sans-serif;
@@ -31,8 +33,7 @@
 }
 
 .auth-header .logo {
-  width: 60px;
-  height: 60px;
+  width: 150px;
   object-fit: contain;
   margin-bottom: 8px;
 }
@@ -61,8 +62,13 @@
   font-size: 14px;
 }
 
+p { 
+  font-family: var(--font);
+}
+
 .auth-form input::placeholder {
   color: #6c757d;
+  font-family: var(--font);
 }
 
 /* Zapamiętaj i link */
@@ -76,18 +82,34 @@
 .auth-options a {
   color: #00D9FF;
   text-decoration: none;
+  font-family: var(--font);
+}
+
+.auth-options label {
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Przyciski */
 .login-btn {
-  background: linear-gradient(90deg, #E94560, #F79824);
-  color: white;
+  background: linear-gradient(30deg,#E94560 35%,#00D9FF 100%);
+  color:#fff;
   border: none;
-  padding: 12px;
+  padding: 12px 32px;
   border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
+  font: 700 15px/1 var(--font);
+  cursor:pointer;
+  background-size: 200% 100%;
+  background-position: 0 0;
+  transition:background-position .45s ease-out;
 }
+
+.login-btn:hover{
+  background-position: 100% 0;
+}
+
 
 .register-btn {
   background-color: transparent;
@@ -96,6 +118,7 @@
   padding: 12px;
   border-radius: 8px;
   font-weight: bold;
+  font-family: var(--font);
   cursor: pointer;
 }
 
@@ -104,6 +127,7 @@
   border: none;
   color: #F0F6FC;
   font-size: 13px;
+  font-family: var(--font);
   cursor: pointer;
   text-align: center;
   margin-top: 4px;
@@ -114,6 +138,7 @@
   text-align: center;
   margin: 8px 0;
   font-size: 13px;
+  font-family: var(--font);
   color: #666;
 }
 
@@ -138,6 +163,7 @@
   background-color: #0A0A0F;
   color: white;
   font-weight: 500;
+  font-family: var(--font);
   cursor: pointer;
 }
 

@@ -40,9 +40,8 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
     <div className="auth-container">
       <form className="auth-form" onSubmit={handleSubmit}>
         <div className="auth-header">
-          <img src="logo.png" alt="Logo" className="logo" />
-          <h1>BATTLE ZONE</h1>
-          <p>2D Shooter Experience</p>
+          <img src="/logo.png" alt="Logo" className="logo" />
+          <p>2D Shooter</p>
         </div>
 
         {isRegister && (

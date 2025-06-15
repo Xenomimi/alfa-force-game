@@ -121,6 +121,11 @@
       gap: 20px;
       align-items: center;
     }
+
+    .action-btn:hover {
+        background-color: var(--bg-dark-secondary);
+    }
+
     .action-btn:last-child {
         margin-bottom: 0;
     }
@@ -136,11 +141,19 @@
       color: var(--accent-blue-header);
     }
 
+    .action-btn.create-room:hover {
+      background: #3c4045;
+    }
+
     .action-btn.join-room {
       background: var(--bg-dark-tertiary);
       border-color: var(--accent-green-header);
       color: var(--accent-green-header);
-}
+  }
+
+    .action-btn.join-room:hover {
+      background: #3c4045;
+    }
 
     .game-modes, .activity-feed {
       list-style: none;
