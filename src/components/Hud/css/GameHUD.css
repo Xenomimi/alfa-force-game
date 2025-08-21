@@ -1,21 +1,6 @@
-.game-wrapper {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-  image-rendering: pixelated;
-}
-
 .game-hud-container {
-  position: relative;
+  position: absolute;
+  z-index: 20;
   width: 100%;
   height: 100%;
   pointer-events: none;
@@ -122,13 +107,6 @@ canvas {
   animation: scoreboardOut .25s cubic-bezier(.55,.085,.68,.53) forwards;
 }
 
-
-
 .leader-table thead {
   font-size: 14px;
 }
-
-
-
-
-

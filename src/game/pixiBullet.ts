@@ -1,4 +1,5 @@
-import { Player } from "./player";
+import * as PIXI from 'pixi.js';
+import { Player } from "./pixiPlayer";
 import CollisionChecker from "./collisionChecker";
 
 type Point = { x: number; y: number };
@@ -18,6 +19,8 @@ export class Bullet {
     lastY: number;
     private collisionChecker: CollisionChecker;
     private hasCollided: boolean;
+    private graphics: PIXI.Graphics;
+    private container: PIXI.Container;
 
     constructor(
         x: number,
@@ -25,7 +28,8 @@ export class Bullet {
         targetX: number,
         targetY: number,
         playerId: string,
-        collisionChecker?: CollisionChecker // Opcjonalny parametr, bo inne miejsca mogą nie przekazywać
+        collisionChecker: CollisionChecker,
+        parentContainer: PIXI.Container
     ) {
         this.x = x;
         this.y = y;
@@ -35,7 +39,7 @@ export class Bullet {
         this.radius = 4;
         this.playerId = playerId;
         this.trail = [];
-        this.collisionChecker = collisionChecker || new CollisionChecker([]); // Domyślna pusta instancja, jeśli brak
+        this.collisionChecker = collisionChecker;
         this.hasCollided = false;
 
         const dx = targetX - this.x;
@@ -51,6 +55,11 @@ export class Bullet {
         }
 
         this.angle = Math.atan2(this.directionY, this.directionX);
+
+        this.container = new PIXI.Container();
+        this.graphics = new PIXI.Graphics();
+        this.container.addChild(this.graphics);
+        parentContainer.addChild(this.container);
     }
 
     update() {
@@ -88,20 +97,16 @@ export class Bullet {
         });
     }
 
-    draw(ctx: CanvasRenderingContext2D) {
+    draw() {
+        this.graphics.clear();
         this.trail.forEach((point, index) => {
             const size = this.radius * (1 - (index / this.trail.length) * 0.7);
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0, 255, 0, ${point.alpha * 0.5})`;
-            ctx.fill();
-            // 187, 188, 189
+            this.graphics.beginFill(0x00FF00, point.alpha * 0.5);
+            this.graphics.drawCircle(point.x - this.x, point.y - this.y, size);
+            this.graphics.endFill();
         });
-
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        ctx.restore();
+        this.container.x = this.x;
+        this.container.y = this.y;
     }
 
     isOffscreen(canvasWidth: number, canvasHeight: number): boolean {
@@ -141,5 +146,9 @@ export class Bullet {
 
     shouldRemove(canvasWidth: number, canvasHeight: number): boolean {
         return this.isOffscreen(canvasWidth, canvasHeight) || this.hasCollided;
+    }
+
+    destroy() {
+        this.container.destroy({ children: true });
     }
 }

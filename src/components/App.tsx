@@ -2,16 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import LoginRegisterScreen from './LoginRegisterScreen.tsx';
 import LobbyScreen from './Lobby/LobbyScreen.tsx';
 import GameHUD from './Hud/GameHUD.tsx';
-import { Game } from '../game/game';
+import { Game } from '../game/pixiGame.ts';
 import '../styles/style.css';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'login' | 'lobby' | 'game'>(() => {
     const stored = localStorage.getItem('isLoggedIn');
-    return stored === 'true' ? 'lobby' : 'login';
+    return stored === 'true' ? 'game' : 'login';
   });
 
   const gameInstanceRef = useRef<Game | null>(null);
+  const pixiContainerRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = () => {
     localStorage.setItem('isLoggedIn', 'true');
@@ -32,43 +33,40 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (screen === 'game') {
-      const backgroundCanvas = document.getElementById('backgroundCanvas') as HTMLCanvasElement;
-      const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+    if (screen === 'game' && pixiContainerRef.current) {
+      const container = pixiContainerRef.current;
 
       const updateCanvasSize = () => {
-        const aspectRatio = 1600 / 1048;
-        let canvasWidth = window.innerWidth;
-        let canvasHeight = window.innerHeight;
+        const targetWidth = 1920;
+        const targetHeight = 1080;
+        const aspectRatio = targetWidth / targetHeight;
 
-        if (canvasWidth / canvasHeight > aspectRatio) {
-          canvasWidth = canvasHeight * aspectRatio;
+        let containerWidth = window.innerWidth;
+        let containerHeight = window.innerHeight;
+
+        if (containerWidth / containerHeight > aspectRatio) {
+          containerWidth = containerHeight * aspectRatio;
         } else {
-          canvasHeight = canvasWidth / aspectRatio;
+          containerHeight = containerWidth / aspectRatio;
         }
 
-        [backgroundCanvas, gameCanvas].forEach(canvas => {
-          canvas.style.width = `${canvasWidth}px`;
-          canvas.style.height = `${canvasHeight}px`;
-          canvas.width = 1600;
-          canvas.height = 1048;
-        });
-
-        backgroundCanvas.width = 3360;
-        backgroundCanvas.height = 2538;
+        container.style.width = `${containerWidth}px`;
+        container.style.height = `${containerHeight}px`;
       };
 
       updateCanvasSize();
       window.addEventListener('resize', updateCanvasSize);
 
-      const game = new Game(backgroundCanvas, gameCanvas);
+      const game = new Game(container);
       gameInstanceRef.current = game;
-      gameInstanceRef.current.start();
+      game.start();
 
       return () => {
         window.removeEventListener('resize', updateCanvasSize);
-        game.stop();
-        gameInstanceRef.current = null;
+        if (gameInstanceRef.current) {
+          gameInstanceRef.current.stop();
+          gameInstanceRef.current = null;
+        }
       };
     }
   }, [screen]);
@@ -83,9 +81,9 @@ const App: React.FC = () => {
 
   return (
     <div className="game-wrapper">
-      <canvas style={{ display: 'none' }} id="backgroundCanvas"></canvas>
-      <canvas id="gameCanvas"></canvas>
-      <GameHUD onLogout={handleGameExit} />
+      <div id="pixiContainer" ref={pixiContainerRef}>
+        <GameHUD onLogout={handleGameExit} />
+      </div>
     </div>
   );
 };
