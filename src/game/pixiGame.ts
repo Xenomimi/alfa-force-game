@@ -81,7 +81,7 @@ export class Game {
         const playerHeight = 150;
         const playerWidth = 50;
         const playerBottom = playerHeight / 2 ;
-        const speedX = 10;
+        const speedX = 15;
         const jumpVelocity = -20;
 
 
@@ -105,7 +105,8 @@ export class Game {
 
         // Aktualizacje gracza
         this.app.ticker.add(() => {
-            
+            if (!this.player._armatureDisplay) return;
+            let moving = false;
             this.player.playerContainer.x = this.playerBody.position.x;
             this.player.playerContainer.y = this.playerBody.position.y;
             playerBodyGraphics.x = this.playerBody.position.x;
@@ -115,18 +116,28 @@ export class Game {
             let velocity = { x: this.playerBody.velocity.x, y: this.playerBody.velocity.y };
             if (keysPressed['a']) {
                 velocity.x = -speedX;
+                moving = true;
             }
                 
             if (keysPressed['d']) {
-                velocity.x = speedX; 
+                velocity.x = speedX;
+                moving = true;
             }
             if (keysPressed['w']) {
                 velocity.y = jumpVelocity; 
             }
-            else 
-                // naturalne hamowanie dzięki friction
-                velocity.x *= 0.9;
             
+            if (!moving) {
+                velocity.x *= 0.9;
+                if (this.player._armatureDisplay.animation.lastAnimationName !== "idle") {
+                    this.player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+                }
+            } else {
+                if (this.player._armatureDisplay.animation.lastAnimationName !== "run") {
+                    this.player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+                }
+            }
+
             this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport); 
             Matter.Body.setVelocity(this.playerBody, velocity);
         });
@@ -289,13 +300,7 @@ export class Game {
         await PIXI.Assets.load([
             { alias: 'background', src: './map.jpg' },
             { alias: 'foreground', src: './foreground.png' },
-            { alias: 'gun', src: '/1654.png' },
-            { alias: 'head', src: './head.png' },
-            { alias: 'torso', src: './torso.png' },
-            { alias: 'joint', src: './joint.png' },
-            { alias: 'hand', src: './hand.png' },
-            { alias: 'forearm', src: './forearm.png' },
-            { alias: 'leg', src: './leg.png' }
+            { alias: 'gun', src: '/1654.png' }
         ]);
 
         this.backgroundSprite.texture = PIXI.Texture.from('background');

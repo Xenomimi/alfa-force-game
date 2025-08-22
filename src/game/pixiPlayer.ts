@@ -8,8 +8,8 @@ type ArmatureDisplayType = PixiArmatureDisplay;
 export class Player {
     protected readonly _resources: string[] = [];
     protected _pixiResources: any;
-    private _armatureDisplay!: ArmatureDisplayType;
-    private _armature!: Armature;
+    _armatureDisplay!: ArmatureDisplayType;
+    _armature!: Armature;
     viewport!: Viewport;
     id: string;
     socket: Socket;
@@ -61,18 +61,11 @@ export class Player {
         this.factory = PixiFactory.factory; 
 
         
-        this._resources.push(
-            "player/char_ske.json",
-            "player/char_tex.json",
-            "player/char_tex.png"
-        )
+        this.init(this.playerContainer);
 
         this.width = 30;
         this.height = 60;
 
-
-
-        this.init(this.playerContainer);
     }
 
     private async init(playerContainer: PIXI.Container) {
@@ -86,9 +79,12 @@ export class Player {
         this._armatureDisplay.y = this.y;
         this._armatureDisplay.debugDraw = true;
         this._armatureDisplay.scale.set(2.5);
-        this._armatureDisplay.animation.play("animtion0");
+        this._armatureDisplay.animation.play("idle");
 
         playerContainer.addChild(this._armatureDisplay);
+
+        await this.setGun(this._armature);
+        await this.setGun(this._armature);
     }
 
     loadTextures() {
@@ -98,6 +94,11 @@ export class Player {
     }
     
     protected async _loadResources() {
+        this._resources.push(
+            "player/char_ske.json",
+            "player/char_tex.json",
+            "player/char_tex.png"
+        )
         await PIXI.Assets.load(this._resources).then((resources) => {
             this._pixiResources = resources;
         });
@@ -120,8 +121,6 @@ export class Player {
         const dx = mouseX - boneInViewport.x;
         const dy = mouseY - boneInViewport.y;
 
-        console.log("dx: ", dx, "dy: ", dy);
-
         // ustawiamy flipX na podstawie kierunku myszy
         this._armatureDisplay.armature.flipX = dx < 0;
 
@@ -136,6 +135,35 @@ export class Player {
         // ustawiamy rotację na kości
         bone.offset.rotation = angle;
         bone.invalidUpdate();
+    }
+
+    async setGun(armature: Armature) {
+        const slot = armature.getSlot('bone')!;
+
+        try {
+            const tex: PIXI.Texture = PIXI.Assets.get('gun');
+            const newDisplay = new PIXI.Sprite(tex);
+            const currentDisplay = slot.display;
+            
+            newDisplay.anchor.set(0.2, 0.5);
+            newDisplay.scale.set(0.3);
+            // Teksture musimy opakować w kontener po to żeby działało 
+            // skalowanie romiaru broni
+            const cont = new PIXI.Container();
+            cont.addChild(newDisplay);
+
+            // Podmieniamy cały display na wrapper
+            const list = slot.displayList;
+            console.log('Current display list:', list);
+            list[0] = cont;
+            slot.displayList = list;
+            slot.displayIndex = 0;
+
+            slot.invalidUpdate();
+
+        } catch (error) {
+            console.error('Błąd podczas ustawiania tekstury broni:', error);
+        }
     }
 
 // drawDeathAnimation() {
