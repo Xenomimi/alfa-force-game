@@ -41,15 +41,15 @@ export class Game {
     private isRunning: boolean = false;
     private shootSound!: HTMLAudioElement;
 
-    // private boundHandleMouseDown: (event: MouseEvent) => void;
-    // private boundHandleMouseUp: (event: MouseEvent) => void;
+    private boundHandleMouseDown: (event: MouseEvent) => void;
+    private boundHandleMouseUp: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
 
     constructor(containerElement: HTMLDivElement) {
-        // this.boundHandleMouseDown = this.handleMouseDown.bind(this);
-        // this.boundHandleMouseUp = this.handleMouseUp.bind(this);
+        this.boundHandleMouseDown = this.handleMouseDown.bind(this);
+        this.boundHandleMouseUp = this.handleMouseUp.bind(this);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         (async () => {
@@ -138,7 +138,8 @@ export class Game {
                 }
             }
 
-            this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport); 
+            this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
+            this.updateBullets();
             Matter.Body.setVelocity(this.playerBody, velocity);
         });
     }
@@ -329,68 +330,86 @@ export class Game {
         });
     }
 
-    // private handleMouseDown() {
-    //     if (!this.player.isAlive) return;
+    private handleMouseDown() {
+        if (!this.player.isAlive) return;
+        const armatureDisplay = this.player._armatureDisplay;
+        const bone = this.player._armature.getBone("bone");
+        if (!bone) return;
 
-    //     const { handPos, targetX, targetY } = this.calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
-    //     const bullet = new Bullet(
-    //         handPos.x,
-    //         handPos.y,
-    //         targetX,
-    //         targetY,
-    //         this.player.id,
-    //         collisionChecker,
-    //         this.container
-    //     );
-    //     this.bullets.push(bullet);
+        const localPos = new PIXI.Point(bone.global.x, bone.global.y);
+        const globalPos = armatureDisplay.toGlobal(localPos);
+        const startPos = this.viewport.toLocal(globalPos);
 
-    //     socket.emit('player_shoot', {
-    //         x: handPos.x,
-    //         y: handPos.y,
-    //         targetX: targetX,
-    //         targetY: targetY,
-    //         playerId: this.player.id
-    //     });
+        const offset = 80; // odległość od ręki, z której wychodzi pocisk
 
-    //     const shootSoundInstance = new Audio(this.shootSound.src);
-    //     shootSoundInstance.volume = this.shootSound.volume;
-    //     shootSoundInstance.play();
+        const offsetX = Math.cos(this.player.aimAngle) * offset;
+        const offsetY = Math.sin(this.player.aimAngle) * offset;
 
-    //     if (!this.shootingInterval) {
-    //         this.shootingInterval = setInterval(() => {
-    //             const { handPos, targetX, targetY } = this.calculateHandPositionAndDirection(this.player, this.mouseX, this.mouseY, this.camera);
-    //             const bullet = new Bullet(
-    //                 handPos.x,
-    //                 handPos.y,
-    //                 targetX,
-    //                 targetY,
-    //                 this.player.id,
-    //                 collisionChecker,
-    //                 this.container
-    //             );
-    //             this.bullets.push(bullet);
 
-    //             socket.emit('player_shoot', {
-    //                 x: handPos.x,
-    //                 y: handPos.y,
-    //                 targetX: targetX,
-    //                 targetY: targetY,
-    //                 playerId: this.player.id
-    //             });
+        const bullet = new Bullet(
+            startPos.x + offsetX,
+            startPos.y + offsetY,
+            this.player.aimAngle,
+            this.player.id,
+            this.gameContainer
+        );
 
-    //             const shootSoundInstance = new Audio(this.shootSound.src);
-    //             shootSoundInstance.volume = this.shootSound.volume;
-    //             shootSoundInstance.play();
-    //         }, 100);
-    //     }
-    // }
+        this.bullets.push(bullet);
 
-    // private handleMouseUp() {
-    //     if (this.shootingInterval) {
-    //         clearInterval(this.shootingInterval);
-    //         this.shootingInterval = null;
-    //     }
-    // }
+        // // socket.emit('player_shoot', {
+        // //     x: handPos.x,
+        // //     y: handPos.y,
+        // //     targetX: targetX,
+        // //     targetY: targetY,
+        // //     playerId: this.player.id
+        // // });
+
+        const shootSoundInstance = new Audio(this.shootSound.src);
+        shootSoundInstance.volume = this.shootSound.volume;
+        shootSoundInstance.play();
+
+        if (!this.shootingInterval) {
+            this.shootingInterval = setInterval(() => {
+                const localPos = new PIXI.Point(bone.global.x, bone.global.y);
+                const globalPos = armatureDisplay.toGlobal(localPos);
+                const startPos = this.viewport.toLocal(globalPos);
+
+                const offset = 80; // odległość od ręki, z której wychodzi pocisk
+
+                const offsetX = Math.cos(this.player.aimAngle) * offset;
+                const offsetY = Math.sin(this.player.aimAngle) * offset;
+
+
+                const bullet = new Bullet(
+                    startPos.x + offsetX,
+                    startPos.y + offsetY,
+                    this.player.aimAngle,
+                    this.player.id,
+                    this.gameContainer
+                );
+
+                this.bullets.push(bullet);
+                // socket.emit('player_shoot', {
+                //     x: handPos.x,
+                //     y: handPos.y,
+                //     targetX: targetX,
+                //     targetY: targetY,
+                //     playerId: this.player.id
+                // });
+
+                const shootSoundInstance = new Audio(this.shootSound.src);
+                shootSoundInstance.volume = this.shootSound.volume;
+                shootSoundInstance.play();
+            }, 100);
+        }
+    }
+
+    private handleMouseUp() {
+        if (this.shootingInterval) {
+            clearInterval(this.shootingInterval);
+            this.shootingInterval = null;
+        }
+    }
 
     // setupSocketListeners() {
     //     socket.on('player_health_update', (data: { playerId: string, health: number }) => {
@@ -543,20 +562,10 @@ export class Game {
     // }
 
     setupEventListeners() {
-        // this.boundHandleMouseDown = this.handleMouseDown.bind(this);
-        // this.boundHandleMouseUp = this.handleMouseUp.bind(this);
-        // this.boundHandleMouseMove = this.handleMouseMove.bind(this);
-        this.boundHandleKeyDown = this.handleKeyDown.bind(this);
-        this.boundHandleKeyUp = this.handleKeyUp.bind(this);
-
         document.addEventListener('keydown', this.boundHandleKeyDown);
         document.addEventListener('keyup', this.boundHandleKeyUp);
-        this.app.stage.on('pointermove', (event: PIXI.FederatedPointerEvent) => {
-
-        });
-        // document.addEventListener('mousemove', this.boundHandleMouseMove);
-        // document.addEventListener('mousedown', this.boundHandleMouseDown);
-        // document.addEventListener('mouseup', this.boundHandleMouseUp);
+        document.addEventListener('pointerdown', this.boundHandleMouseDown);
+        document.addEventListener('pointerup', this.boundHandleMouseUp);
     }
 
     // keyDown / keyUp
@@ -588,9 +597,8 @@ export class Game {
     removeEventListeners() {
         document.removeEventListener('keydown', this.boundHandleKeyDown);
         document.removeEventListener('keyup', this.boundHandleKeyUp);
-        // document.removeEventListener('mousemove', this.boundHandleMouseMove);
-        // document.removeEventListener('mousedown', this.boundHandleMouseDown);
-        // document.removeEventListener('mouseup', this.boundHandleMouseUp);
+        document.removeEventListener('pointerdown', this.boundHandleMouseDown);
+        document.removeEventListener('pointerup', this.boundHandleMouseUp);
         if (this.shootingInterval) {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;
@@ -645,8 +653,8 @@ export class Game {
     async stop() {
         this.isRunning = false;
         this.app.ticker.stop();
-        // this.removeEventListeners();
-        // socket.disconnect();
+        this.removeEventListeners();
+        socket.disconnect();
         this.app.stop();
         this.app.destroy(true);
     }
@@ -700,37 +708,37 @@ export class Game {
     }
 
 
-    // updateBullets() {
-    //     for (let i = this.bullets.length - 1; i >= 0; i--) {
-    //         const bullet = this.bullets[i];
-    //         bullet.update();
+    updateBullets() {
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const bullet = this.bullets[i];
+            bullet.update(this.app.ticker.deltaTime);
 
-    //         if (this.player.isAlive && bullet.checkCollision(this.player) && this.player.id !== bullet.playerId) {
-    //             this.handlePlayerHit(bullet.playerId);
-    //             bullet.destroy();
-    //             this.bullets.splice(i, 1);
-    //             continue;
-    //         }
+            // if (this.player.isAlive && bullet.checkCollision(this.player) && this.player.id !== bullet.playerId) {
+            //     this.handlePlayerHit(bullet.playerId);
+            //     bullet.destroy();
+            //     this.bullets.splice(i, 1);
+            //     continue;
+            // }
 
-    //         for (let id in otherPlayers) {
-    //             const otherPlayer = otherPlayers[id];
-    //             if (otherPlayer.isAlive && bullet.checkCollision(otherPlayer)) {
-    //                 socket.emit('player_hit', {
-    //                     hitPlayerId: otherPlayer.id,
-    //                     bulletPlayerId: bullet.playerId
-    //                 });
-    //                 bullet.destroy();
-    //                 this.bullets.splice(i, 1);
-    //                 break;
-    //             }
-    //         }
+            // for (let id in otherPlayers) {
+            //     const otherPlayer = otherPlayers[id];
+            //     if (otherPlayer.isAlive && bullet.checkCollision(otherPlayer)) {
+            //         socket.emit('player_hit', {
+            //             hitPlayerId: otherPlayer.id,
+            //             bulletPlayerId: bullet.playerId
+            //         });
+            //         bullet.destroy();
+            //         this.bullets.splice(i, 1);
+            //         break;
+            //     }
+            // }
 
-    //         if (bullet.shouldRemove(3360, 2538)) {
-    //             bullet.destroy();
-    //             this.bullets.splice(i, 1);
-    //         }
-    //     }
-    // }
+            // if (bullet.shouldRemove(3360, 2538)) {
+            //     bullet.destroy();
+            //     this.bullets.splice(i, 1);
+            // }
+        }
+    }
 
     // handlePlayerHit(shooterId: string, damage: number = 10) {
     //     if (!this.player.isAlive) return;

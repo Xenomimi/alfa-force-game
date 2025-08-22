@@ -22,7 +22,9 @@ export class Player {
     speed: number;
     gravity: number;
     verticalSpeed: number;
-    // isAlive: boolean;
+    isAlive: boolean;
+    handAngle: number;
+    aimAngle: number;
     // health: number;
     // maxHealth: number;
     // deathAnimation: {
@@ -41,11 +43,14 @@ export class Player {
         this.id = socket.id ?? "PlayerName";
         this.x = x;
         this.y = y;
+        this.isAlive = true;
         this.playerName = this.id;
         // this.color = 'rgb(255, 0, 0, 0.5)';
         this.speed = 4;
         this.gravity = 0.19;
         this.verticalSpeed = 0;
+        this.aimAngle = 0;
+        this.handAngle = 0;
         // this.maxHealth = 100;
         // this.health = this.maxHealth;
         // this.isAlive = true;
@@ -77,13 +82,12 @@ export class Player {
         this._armature = await this._armatureDisplay.armature;
         this._armatureDisplay.x = this.x;
         this._armatureDisplay.y = this.y;
-        this._armatureDisplay.debugDraw = true;
+        this._armatureDisplay.debugDraw = false;
         this._armatureDisplay.scale.set(2.5);
         this._armatureDisplay.animation.play("idle");
 
         playerContainer.addChild(this._armatureDisplay);
 
-        await this.setGun(this._armature);
         await this.setGun(this._armature);
     }
 
@@ -121,19 +125,22 @@ export class Player {
         const dx = mouseX - boneInViewport.x;
         const dy = mouseY - boneInViewport.y;
 
+        const aimAngle = Math.atan2(dy, dx);
+        this.aimAngle = aimAngle; // nowa zmienna przechowująca kąt do strzału
+
         // ustawiamy flipX na podstawie kierunku myszy
         this._armatureDisplay.armature.flipX = dx < 0;
 
-        let angle = Math.atan2(dy, dx);
+        this.handAngle = aimAngle;
 
         // jeśli flip = true, odwracamy kąt
         if (this._armatureDisplay.armature.flipX) {
-            angle = Math.PI - angle;
-            if (angle > Math.PI) angle -= Math.PI * 2;
+            this.handAngle = Math.PI - this.aimAngle;
+            if (this.handAngle > Math.PI) this.handAngle -= Math.PI * 2;
         }
 
         // ustawiamy rotację na kości
-        bone.offset.rotation = angle;
+        bone.offset.rotation = this.handAngle;
         bone.invalidUpdate();
     }
 
@@ -145,11 +152,12 @@ export class Player {
             const newDisplay = new PIXI.Sprite(tex);
             const currentDisplay = slot.display;
             
-            newDisplay.anchor.set(0.2, 0.5);
+            newDisplay.anchor.set(0.1, 0.4);
             newDisplay.scale.set(0.3);
             // Teksture musimy opakować w kontener po to żeby działało 
             // skalowanie romiaru broni
             const cont = new PIXI.Container();
+            cont.zIndex = -1;
             cont.addChild(newDisplay);
 
             // Podmieniamy cały display na wrapper
