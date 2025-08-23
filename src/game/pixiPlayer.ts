@@ -150,7 +150,6 @@ export class Player {
         try {
             const tex: PIXI.Texture = PIXI.Assets.get('gun');
             const newDisplay = new PIXI.Sprite(tex);
-            const currentDisplay = slot.display;
             
             newDisplay.anchor.set(0.1, 0.4);
             newDisplay.scale.set(0.3);

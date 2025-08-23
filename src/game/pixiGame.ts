@@ -69,11 +69,12 @@ export class Game {
             await this.loadAssets();
             this.addPsyhics();
             this.drawMap();
-            this.drawDebugBodies();
             this.addPlayer();
+
             this.setupFPSCounter();
             this.createPointer(this.gameContainer);
             this.setupEventListeners();
+            this.drawDebugBodies();
         })();
     }
 
@@ -96,12 +97,14 @@ export class Game {
         });
         
         
-        const playerBodyGraphics = new PIXI.Graphics().rect(-25, -75, playerWidth, playerHeight).fill({ r: 0, g: 255, b: 0, a: 0.5 });
-        Matter.Composite.add(this.world, this.playerBody);
+        // const playerBodyGraphics = new PIXI.Graphics().rect(-25, -75, playerWidth, playerHeight).fill({ r: 0, g: 255, b: 0, a: 0.5 });
+
         this.player = new Player(socket, 0, playerBottom, this.gameContainer);
 
+        Matter.Composite.add(this.world, this.playerBody);
 
-        this.testContainer.addChild(playerBodyGraphics);
+
+        // this.testContainer.addChild(playerBodyGraphics);
 
         // Aktualizacje gracza
         this.app.ticker.add(() => {
@@ -109,9 +112,9 @@ export class Game {
             let moving = false;
             this.player.playerContainer.x = this.playerBody.position.x;
             this.player.playerContainer.y = this.playerBody.position.y;
-            playerBodyGraphics.x = this.playerBody.position.x;
-            playerBodyGraphics.y = this.playerBody.position.y;
-            playerBodyGraphics.rotation = this.playerBody.angle;
+            // playerBodyGraphics.x = this.playerBody.position.x;
+            // playerBodyGraphics.y = this.playerBody.position.y;
+            // playerBodyGraphics.rotation = this.playerBody.angle;
 
             let velocity = { x: this.playerBody.velocity.x, y: this.playerBody.velocity.y };
             if (keysPressed['a']) {
@@ -143,73 +146,139 @@ export class Game {
             Matter.Body.setVelocity(this.playerBody, velocity);
         });
     }
+
     private drawDebugBodies() {
         this.app.stage.sortableChildren = true;
 
         const debugGraphics = new PIXI.Graphics();
-        debugGraphics.name = 'debugBodies';
-        debugGraphics.zIndex = 9999;
+        debugGraphics.zIndex = 1000;
 
-        const drawContainer: PIXI.Container = this.testContainer ?? this.gameContainer ?? this.app.stage;
+        const drawContainer: PIXI.Container = this.testContainer;
         drawContainer.addChild(debugGraphics);
 
-        // Dodajemy ticker tylko raz
+        console.log('DEBUG: debugGraphics dodane do testContainer');
+
         this.app.ticker.add(() => {
             debugGraphics.clear();
 
-            // szybkie sprawdzenie czy są w ogóle ciała
             const bodies = Matter.Composite.allBodies(this.world);
             if (!bodies || bodies.length === 0) {
-                // console.log('DEBUG: brak ciał w matter world');
+                console.log('DEBUG: brak ciał w matter world');
                 return;
             }
 
-            // Rysuj krawędzie
-            debugGraphics.lineStyle(2, 0xff0000, 1);
-
             for (const body of bodies) {
-                // mały marker środka ciała
-                debugGraphics.beginFill(0xff0000, 0.4);
-                debugGraphics.drawCircle(body.position.x, body.position.y, 3);
+                console.log('DEBUG: Drawing body:', body.label, 'position:', body.position, 'circleRadius:', (body as any).circleRadius);
+
+                // Wypełnienie
+                debugGraphics.beginFill(0x00ff00, 0.4);
+
+                if ((body as any).circleRadius && (body as any).circleRadius > 0) {
+                    // Dla okręgów (np. pociski)
+                    debugGraphics.drawCircle(body.position.x, body.position.y, (body as any).circleRadius);
+                } else {
+                    // Dla wielokątów (np. gracz)
+                    const part = body.parts[0];
+                    if (part && part.vertices && part.vertices.length > 0) {
+                        const v = part.vertices;
+                        debugGraphics.moveTo(v[0].x, v[0].y);
+                        for (let i = 1; i < v.length; i++) {
+                            debugGraphics.lineTo(v[i].x, v[i].y);
+                        }
+                        debugGraphics.lineTo(v[0].x, v[0].y);
+                        debugGraphics.closePath();
+                    }
+                }
                 debugGraphics.endFill();
 
-                const startIndex = 0;
-
-                for (let p = startIndex; p < body.parts.length; p++) {
-                    const part = body.parts[p];
-                    if (!part || !part.vertices || part.vertices.length === 0) continue;
-
-                    // rysuj poly
-                    const v = part.vertices;
-                    debugGraphics.moveTo(v[0].x, v[0].y);
-                    for (let i = 1; i < v.length; i++) {
-                        debugGraphics.lineTo(v[i].x, v[i].y);
-                    }
-                    debugGraphics.lineTo(v[0].x, v[0].y);
-                }
-
-                // jeśli body ma promień (okrągłe)
+                // Czerwone obramowanie
+                debugGraphics.lineStyle(2, 0xff0000, 1);
+                debugGraphics.beginFill(0, 0);
                 if ((body as any).circleRadius && (body as any).circleRadius > 0) {
                     debugGraphics.drawCircle(body.position.x, body.position.y, (body as any).circleRadius);
+                } else {
+                    const part = body.parts[0];
+                    if (part && part.vertices && part.vertices.length > 0) {
+                        const v = part.vertices;
+                        debugGraphics.moveTo(v[0].x, v[0].y);
+                        for (let i = 1; i < v.length; i++) {
+                            debugGraphics.lineTo(v[i].x, v[i].y);
+                        }
+                        debugGraphics.lineTo(v[0].x, v[0].y);
+                    }
                 }
-            }
-        });
+                debugGraphics.endFill();
 
-        console.log('DEBUG: debugGraphics dodane do', drawContainer === this.testContainer ? 'testContainer' : drawContainer === this.gameContainer ? 'gameContainer' : 'app.stage');
+                // Srodek cięzkosci
+                debugGraphics.lineStyle(2);
+                debugGraphics.beginFill(0x0000ff, 0.8);
+                debugGraphics.drawCircle(body.position.x, body.position.y, 3);
+                debugGraphics.endFill();
+            }
+        }, undefined, PIXI.UPDATE_PRIORITY.HIGH);
     }
 
     private addPsyhics() {
+
+        // Nowa flaga ignoreGravity dla ciał w Matter.js
+        Matter.Engine._bodiesApplyGravity = function(bodies, gravity) {
+            var gravityScale = typeof gravity.scale !== 'undefined' ? gravity.scale : 0.001,
+                bodiesLength = bodies.length;
+
+            if ((gravity.x === 0 && gravity.y === 0) || gravityScale === 0) {
+                return;
+            }
+            
+            for (var i = 0; i < bodiesLength; i++) {
+                var body = bodies[i];
+
+                if (body.isStatic || body.isSleeping || body.ignoreGravity)
+                    continue;
+
+                // add the resultant force of gravity
+                body.force.y += body.mass * gravity.y * gravityScale;
+                body.force.x += body.mass * gravity.x * gravityScale;
+            }
+        };
+
         this.engine = Matter.Engine.create({
             gravity: { x: 0, y: 2.5 },
             positionIterations: 6,
             velocityIterations: 4,
             constraintIterations: 2
         });
+
+
         this.world = this.engine.world;
         console.log("TICKER DELTA", this.app.ticker.deltaMS);
         Matter.Runner.run(this.engine);
         this.app.ticker.add(() => {
             Matter.Engine.update(this.engine, this.app.ticker.deltaMS);
+        }, undefined, PIXI.UPDATE_PRIORITY.HIGH);
+
+
+        // Zdarzenia kolizji
+        Matter.Events.on(this.engine, "collisionStart", (event) => {
+            for (const pair of event.pairs) {
+                const a = pair.bodyA;
+                const b = pair.bodyB;
+
+                if (a.label === "bullet" && b.label === "wall") {
+                    (a as any).bulletRef.hasCollided = true;
+                }
+                if (b.label === "bullet" && a.label === "wall") {
+                    (b as any).bulletRef.hasCollided = true;
+                }
+
+                if (a.label === "bullet" && b.label === "player") {
+                    console.log("Hit player", b.id);
+                    (a as any).bulletRef.hasCollided = true;
+                }
+                if (b.label === "bullet" && a.label === "player") {
+                    console.log("Hit player", a.id);
+                    (b as any).bulletRef.hasCollided = true;
+                }
+            }
         });
     }
 
@@ -351,7 +420,8 @@ export class Game {
             startPos.y + offsetY,
             this.player.aimAngle,
             this.player.id,
-            this.gameContainer
+            this.gameContainer,
+            this.world
         );
 
         this.bullets.push(bullet);
@@ -385,7 +455,8 @@ export class Game {
                     startPos.y + offsetY,
                     this.player.aimAngle,
                     this.player.id,
-                    this.gameContainer
+                    this.gameContainer,
+                    this.world
                 );
 
                 this.bullets.push(bullet);
@@ -681,7 +752,7 @@ export class Game {
                     center.x,
                     center.y,   
                     [matterPoints],
-                    { isStatic: true }
+                    { isStatic: true, label: 'wall' },
                 );
                 Matter.Composite.add(this.world, mapElementBody);
                 
@@ -699,7 +770,7 @@ export class Game {
                     (obj.y + obj.height / 2) * scaleFactor,
                     obj.width * scaleFactor,
                     obj.height * scaleFactor,
-                    { isStatic: true }
+                    { isStatic: true, label: 'wall' }
                 );
                 Matter.Composite.add(this.world, mapElementBody);
             }
@@ -711,7 +782,7 @@ export class Game {
     updateBullets() {
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const bullet = this.bullets[i];
-            bullet.update(this.app.ticker.deltaTime);
+            bullet.update();
 
             // if (this.player.isAlive && bullet.checkCollision(this.player) && this.player.id !== bullet.playerId) {
             //     this.handlePlayerHit(bullet.playerId);
