@@ -372,9 +372,19 @@ export class Game {
 
         this.app.stage.addChild(fpsCounter);
 
-        this.app.ticker.add(() => {
-            const fps = Math.round(this.app.ticker.FPS);
-            fpsCounter.text = `FPS: ${fps}`;
+        let elapsed = 0;
+        const updateInterval = 0.1; // w sekundach
+
+        this.app.ticker.add((ticker: PIXI.Ticker) => {
+            // delta w sekundach od ostatniej klatki
+            const deltaSec = ticker.deltaMS / 1000;
+            elapsed += deltaSec;
+
+            if (elapsed >= updateInterval) {
+                const fps = Math.round(ticker.FPS);
+                fpsCounter.text = `FPS: ${fps}`;
+                elapsed = 0;
+            }
         });
     }
 
