@@ -18,7 +18,7 @@ export class Player {
     width: number;
     height: number;
     playerName: string;
-
+    shootingPointOffsetX: number = 80;
     speed: number;
     gravity: number;
     verticalSpeed: number;
@@ -83,7 +83,7 @@ export class Player {
         this._armatureDisplay.x = this.x;
         this._armatureDisplay.y = this.y;
         this._armatureDisplay.debugDraw = false;
-        this._armatureDisplay.scale.set(2.5);
+        this._armatureDisplay.scale.set(2);
         this._armatureDisplay.animation.play("idle");
 
         playerContainer.addChild(this._armatureDisplay);

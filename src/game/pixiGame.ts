@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { io, Socket } from "socket.io-client";
 import { Player } from "./pixiPlayer";
 import { Bullet } from "./pixiBullet";
-import { Camera } from "./pixiCamera";
+import { CameraController } from "./CameraController";
 import mapData from "../assets/map_data.json";
 import { initDevtools } from '@pixi/devtools';
 
@@ -31,7 +31,7 @@ export class Game {
     viewport!: Viewport;
     backgroundSprite!: PIXI.Sprite;
     foregroundSprite!: PIXI.Sprite;
-    camera!: Camera;
+    camera!: CameraController;
     player!: Player;
     playerBody!: Matter.Body;
     prevPlayerPosition!: { x: number, y: number, mouseX: number, mouseY: number, leftThighAngle: number, rightThighAngle: number, legPhase: number };
@@ -70,21 +70,20 @@ export class Game {
             this.addPsyhics();
             this.drawMap();
             this.addPlayer();
-
-            this.setupFPSCounter();
-            this.createPointer(this.gameContainer);
+            this.addCamera();
             this.setupEventListeners();
+            this.createPointer(this.gameContainer);
             this.drawDebugBodies();
+            this.setupFPSCounter();
         })();
     }
 
     private addPlayer() {
-        const playerHeight = 150;
-        const playerWidth = 50;
+        const playerHeight = 140;
+        const playerWidth = 36;
         const playerBottom = playerHeight / 2 ;
         const speedX = 15;
         const jumpVelocity = -20;
-
 
         this.playerBody = Matter.Bodies.rectangle(820, 300, playerWidth, playerHeight, {
             label: 'player',
@@ -142,8 +141,43 @@ export class Game {
             }
 
             this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
+            this.camera.setMouse(this.mouseX, this.mouseY);
+            this.camera.update();
             this.updateBullets();
             Matter.Body.setVelocity(this.playerBody, velocity);
+
+
+            // // pozycja gracza
+            // const playerX = this.playerBody.position.x;
+            // const playerY = this.playerBody.position.y;
+
+            // // pozycja myszy w świecie (masz już mouseX, mouseY w coordsach viewportu)
+            // const mouseWorldX = this.mouseX;
+            // const mouseWorldY = this.mouseY;
+
+            // // policz offset gracza względem myszy
+            // let offsetX = (mouseWorldX - playerX) * 0.5;
+            // let offsetY = (mouseWorldY - playerY) * 0.7;
+
+            // // limit offsetu
+            // const maxOffsetX = 1000;
+            // const maxOffsetY = 1000;
+            // offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offsetX));
+            // offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offsetY));
+
+            // // target = gracz + przesunięcie
+            // const targetX = playerX + offsetX;
+            // const targetY = playerY + offsetY;
+
+            // // interpolacja (płynne przesuwanie)
+            // const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
+            // const lerpFactor = 0.05;
+
+            // const newX = lerp(this.viewport.center.x, targetX, lerpFactor);
+            // const newY = lerp(this.viewport.center.y, targetY, lerpFactor);
+
+            // // ustaw środek viewportu
+            // this.viewport.moveCenter(newX, newY);
         });
     }
 
@@ -313,12 +347,16 @@ export class Game {
         this.viewport.addChild(this.testContainer);
 
         this.viewport
-            .drag()
-            .pinch()
+            // .drag()
+            // .pinch()
+            // .decelerate()
             .wheel()
-            .decelerate()
             .clamp({ direction: 'all' })
             .clampZoom({ minWidth: 1920, minHeight: 1080, maxWidth: 3360, maxHeight: 2538 });
+    }
+
+    private addCamera() {
+        this.camera = new CameraController(this.viewport, this.playerBody);
     }
 
     private setupFPSCounter() {
@@ -391,6 +429,12 @@ export class Game {
         container.addChild(circle);
         circle.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
         this.app.stage.hitArea = this.app.screen;
+        // this.app.ticker.add(() => {
+        //     let mousePosition = this.viewport.toLocal(e.global);
+        //     this.mouseX = mousePosition.x;
+        //     this.mouseY = mousePosition.y;
+        //     circle.position.copyFrom(this.viewport.toLocal(e.global));
+        // });
         this.app.stage.addEventListener('pointermove', (e) => {
             let mousePosition = this.viewport.toLocal(e.global);
             this.mouseX = mousePosition.x;
@@ -409,7 +453,7 @@ export class Game {
         const globalPos = armatureDisplay.toGlobal(localPos);
         const startPos = this.viewport.toLocal(globalPos);
 
-        const offset = 80; // odległość od ręki, z której wychodzi pocisk
+        const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
 
         const offsetX = Math.cos(this.player.aimAngle) * offset;
         const offsetY = Math.sin(this.player.aimAngle) * offset;
@@ -444,7 +488,7 @@ export class Game {
                 const globalPos = armatureDisplay.toGlobal(localPos);
                 const startPos = this.viewport.toLocal(globalPos);
 
-                const offset = 80; // odległość od ręki, z której wychodzi pocisk
+                const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
 
                 const offsetX = Math.cos(this.player.aimAngle) * offset;
                 const offsetY = Math.sin(this.player.aimAngle) * offset;
