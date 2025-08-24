@@ -102,7 +102,6 @@ export class Game {
 
         Matter.Composite.add(this.world, this.playerBody);
 
-
         // this.testContainer.addChild(playerBodyGraphics);
 
         // Aktualizacje gracza
@@ -142,42 +141,9 @@ export class Game {
 
             this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
             this.camera.setMouse(this.mouseX, this.mouseY);
-            this.camera.update();
+            this.camera.update(this.app.ticker.deltaMS / 1000);
             this.updateBullets();
             Matter.Body.setVelocity(this.playerBody, velocity);
-
-
-            // // pozycja gracza
-            // const playerX = this.playerBody.position.x;
-            // const playerY = this.playerBody.position.y;
-
-            // // pozycja myszy w świecie (masz już mouseX, mouseY w coordsach viewportu)
-            // const mouseWorldX = this.mouseX;
-            // const mouseWorldY = this.mouseY;
-
-            // // policz offset gracza względem myszy
-            // let offsetX = (mouseWorldX - playerX) * 0.5;
-            // let offsetY = (mouseWorldY - playerY) * 0.7;
-
-            // // limit offsetu
-            // const maxOffsetX = 1000;
-            // const maxOffsetY = 1000;
-            // offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offsetX));
-            // offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offsetY));
-
-            // // target = gracz + przesunięcie
-            // const targetX = playerX + offsetX;
-            // const targetY = playerY + offsetY;
-
-            // // interpolacja (płynne przesuwanie)
-            // const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
-            // const lerpFactor = 0.05;
-
-            // const newX = lerp(this.viewport.center.x, targetX, lerpFactor);
-            // const newY = lerp(this.viewport.center.y, targetY, lerpFactor);
-
-            // // ustaw środek viewportu
-            // this.viewport.moveCenter(newX, newY);
         });
     }
 
@@ -390,9 +356,6 @@ export class Game {
 
     private setupCoreSystems() {
         this.app.stage.eventMode = 'dynamic';
-        // this.camera = new Camera(1600, 1048, 3360, 2538);
-        // this.player = new Player(socket, 850, 300, this.camera, this.gameContainer);
-
 
         // this.prevPlayerPosition = {
         //     x: this.player.x,
@@ -403,7 +366,6 @@ export class Game {
         //     rightThighAngle: this.player.rightThighAngle,
         //     legPhase: this.player.legPhase
         // };
-        // this.camera.follow(this.player);
         this.mouseX = 0;
         this.mouseY = 0;
         this.bullets = [];
@@ -439,17 +401,12 @@ export class Game {
         container.addChild(circle);
         circle.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
         this.app.stage.hitArea = this.app.screen;
-        // this.app.ticker.add(() => {
-        //     let mousePosition = this.viewport.toLocal(e.global);
-        //     this.mouseX = mousePosition.x;
-        //     this.mouseY = mousePosition.y;
-        //     circle.position.copyFrom(this.viewport.toLocal(e.global));
-        // });
-        this.app.stage.addEventListener('pointermove', (e) => {
-            let mousePosition = this.viewport.toLocal(e.global);
+        this.app.ticker.add(() => {
+            const global = this.app.renderer.events.pointer.global;
+            let mousePosition = this.viewport.toLocal(global);
             this.mouseX = mousePosition.x;
             this.mouseY = mousePosition.y;
-            circle.position.copyFrom(this.viewport.toLocal(e.global));
+            circle.position.copyFrom(mousePosition);
         });
     }
 
@@ -480,13 +437,13 @@ export class Game {
 
         this.bullets.push(bullet);
 
-        // // socket.emit('player_shoot', {
-        // //     x: handPos.x,
-        // //     y: handPos.y,
-        // //     targetX: targetX,
-        // //     targetY: targetY,
-        // //     playerId: this.player.id
-        // // });
+        // socket.emit('player_shoot', {
+        //     x: handPos.x,
+        //     y: handPos.y,
+        //     targetX: targetX,
+        //     targetY: targetY,
+        //     playerId: this.player.id
+        // });
 
         const shootSoundInstance = new Audio(this.shootSound.src);
         shootSoundInstance.volume = this.shootSound.volume;
@@ -693,7 +650,6 @@ export class Game {
         document.addEventListener('pointerup', this.boundHandleMouseUp);
     }
 
-    // keyDown / keyUp
     private handleKeyDown(event: KeyboardEvent) {
         keysPressed[event.key] = true;
     }
@@ -702,7 +658,6 @@ export class Game {
         keysPressed[event.key] = false;
     }
 
-    // Funkcja sprawdzająca czy gracz jest na ziemi
     private isPlayerOnGround(): boolean {
         const startPoint = this.playerBody.position;
         const endPoint = {

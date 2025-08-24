@@ -18,7 +18,7 @@ export class Player {
     width: number;
     height: number;
     playerName: string;
-    shootingPointOffsetX: number = 80;
+    shootingPointOffsetX: number = 60;
     speed: number;
     gravity: number;
     verticalSpeed: number;

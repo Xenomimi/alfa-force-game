@@ -9,7 +9,7 @@ export class CameraController {
 
     private maxOffsetX = 1000;
     private maxOffsetY = 1000;
-    private lerpFactor = 0.05;
+    private lerpFactor = 3;
 
     constructor(viewport: Viewport, playerBody: Matter.Body) {
         this.viewport = viewport;
@@ -25,7 +25,7 @@ export class CameraController {
         return start + (end - start) * t;
     }
 
-    update() {
+    update(deltaTime: number) {
         const playerX = this.playerBody.position.x;
         const playerY = this.playerBody.position.y;
 
@@ -43,8 +43,10 @@ export class CameraController {
         const targetX = playerX + offsetX;
         const targetY = playerY + offsetY;
 
-        const newX = this.lerp(this.viewport.center.x, targetX, this.lerpFactor);
-        const newY = this.lerp(this.viewport.center.y, targetY, this.lerpFactor);
+        const blend = 1 - Math.pow(0.1, this.lerpFactor * deltaTime);
+
+        const newX = this.lerp(this.viewport.center.x, targetX, blend);
+        const newY = this.lerp(this.viewport.center.y, targetY, blend);
 
         this.viewport.moveCenter(newX, newY);
     }
