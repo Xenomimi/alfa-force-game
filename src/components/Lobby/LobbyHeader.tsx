@@ -9,7 +9,7 @@ interface LobbyHeaderProps {
   onLogout: () => void;
 }
 
-const LobbyHeader: React.FC<LobbyHeaderProps> = ({ onLogout}) => (
+const LobbyHeader: React.FC<LobbyHeaderProps> = ({ onLogout }) => (
   <>
     <header className="lobby-header">
       <div className="user-info">

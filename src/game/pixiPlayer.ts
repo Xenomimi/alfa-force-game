@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-import { Socket } from "socket.io-client";
 import { Viewport } from 'pixi-viewport';
 import { PixiArmatureDisplay, PixiFactory, Armature } from 'dragonbones-pixijs';
 
@@ -11,13 +10,13 @@ export class Player {
     _armatureDisplay!: ArmatureDisplayType;
     _armature!: Armature;
     viewport!: Viewport;
-    id: string;
-    socket: Socket;
+    // id: string;
+    // socket: Socket;
     x: number;
     y: number;
     width: number;
     height: number;
-    playerName: string;
+    // playerName: string;
     shootingPointOffsetX: number = 60;
     speed: number;
     gravity: number;
@@ -38,13 +37,13 @@ export class Player {
     playerContainer: PIXI.Container;
     factory: PixiFactory;
 
-    constructor(socket: Socket, x: number, y: number, parentContainer: PIXI.Container) {
-        this.socket = socket;
-        this.id = socket.id ?? "PlayerName";
+    constructor(x: number, y: number, parentContainer: PIXI.Container) {
+        // this.socket = socket;
+        // this.id = socket.id ?? "PlayerName";
         this.x = x;
         this.y = y;
         this.isAlive = true;
-        this.playerName = this.id;
+        // this.playerName = this.id;
         // this.color = 'rgb(255, 0, 0, 0.5)';
         this.speed = 4;
         this.gravity = 0.19;

@@ -38,7 +38,7 @@ const LobbyNav:React.FC<Props> = ({ active, onNavigate }) => {
       {SECTIONS.map((s, i)=>(
         <button
           key={s.key}
-          ref={el => btnRefs.current[i] = el}
+          ref={(el) => { btnRefs.current[i] = el; }}
           onClick={() => onNavigate(s.key)}
           className={`nav-btn ${active===s.key?'active':''}`}
         >

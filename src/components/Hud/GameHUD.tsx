@@ -11,9 +11,11 @@ const mockScoreboard = [
   { id: 5, name: 'EnemyFive',  kills:  3, deaths:12,  ping:120 },
 ];
 
-interface GameHUDProps { onLogout: () => void }
+interface GameHUDProps { 
+  onGameExit: () => void 
+}
 
-const GameHUD: React.FC<GameHUDProps> = ({ onLogout }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ onGameExit }) => {
   const [showScore, setShowScore] = useState(false);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ onLogout }) => {
   return (
     <div className="game-hud-container">
       {/* górny pasek */}
-      <LobbyHeader onLogout={onLogout} />
+      <LobbyHeader onLogout={onGameExit} />
 
       {/* ►► SCOREBOARD ◄◄ */}
       {showScore && (

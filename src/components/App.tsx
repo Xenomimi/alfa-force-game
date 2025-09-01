@@ -1,91 +1,86 @@
 import React, { useState, useEffect, useRef } from 'react';
 import LoginRegisterScreen from './LoginRegisterScreen.tsx';
 import LobbyScreen from './Lobby/LobbyScreen.tsx';
-import GameHUD from './Hud/GameHUD.tsx';
-import { Game } from '../game/pixiGame.ts';
+import GameComponent from './GameComponent.tsx';
 import '../styles/style.css';
+import { Client, Room } from 'colyseus.js';
+
 
 const App: React.FC = () => {
-  const [screen, setScreen] = useState<'login' | 'lobby' | 'game'>(() => {
-    const stored = localStorage.getItem('isLoggedIn');
-    return stored === 'true' ? 'game' : 'login';
-  });
+    const [screen, setScreen] = useState<'login' | 'lobby' | 'game'>(() => {
+        const stored = localStorage.getItem('isLoggedIn');
+        return stored === 'true' ? 'lobby' : 'login';
+    });
 
-  const gameInstanceRef = useRef<Game | null>(null);
-  const pixiContainerRef = useRef<HTMLDivElement>(null);
+    const clientRef = useRef<Client>(null);
 
-  const handleLogin = () => {
-    localStorage.setItem('isLoggedIn', 'true');
-    setScreen('lobby');
-  };
+    const [isClientReady, setIsClientReady] = useState(false);
+    const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
+    const [gameRoom, setGameRoom] = useState<Room | null>(null);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
-    setScreen('login');
-  };
+    const handleLogin = async () => {
+        localStorage.setItem('isLoggedIn', 'true');
+        setScreen('lobby');
+    };
 
-  const handleGameExit = () => {
-    if (gameInstanceRef.current) {
-      gameInstanceRef.current.stop();
-      gameInstanceRef.current = null;
+    const handleLogout = () => {
+        localStorage.removeItem('isLoggedIn');
+        lobbyRoom?.leave();
+        setLobbyRoom(null);
+        setScreen('login');
+    };
+
+    const handleGameExit = async () => {
+        console.log("XAPP: handleGameExit called");
+        try {
+            console.log(gameRoom);
+            if (gameRoom) {
+                gameRoom.leave();
+                setGameRoom(null);
+            }
+            setScreen('lobby')
+        console.log("Opuściłeś pokój");
+        } catch (err) {
+        console.error("Błąd przy opuszczaniu pokoju:", err);
+        }
     }
-    setScreen('lobby');
-  };
 
-  useEffect(() => {
-    if (screen === 'game' && pixiContainerRef.current) {
-      const container = pixiContainerRef.current;
+    useEffect(() => {
+        if (screen === 'lobby' && !clientRef.current) {
+            clientRef.current = new Client("ws://localhost:2567");
+            setIsClientReady(true);
+        }
+    }, []);
 
-      const updateCanvasSize = () => {
-        const targetWidth = 1920;
-        const targetHeight = 1080;
-        const aspectRatio = targetWidth / targetHeight;
 
-        let containerWidth = window.innerWidth;
-        let containerHeight = window.innerHeight;
+    if (screen === 'login') {
+        return <LoginRegisterScreen onLogin={handleLogin} />;
+    }
 
-        if (containerWidth / containerHeight > aspectRatio) {
-          containerWidth = containerHeight * aspectRatio;
-        } else {
-          containerHeight = containerWidth / aspectRatio;
+    if (screen === 'lobby') {
+        if (!isClientReady) {
+            return (
+                <div style={{ padding: 24, color: '#fff', textAlign: 'center' }}>
+                    <p>Inicjalizacja klienta...</p>
+                </div>
+            );
         }
 
-        container.style.width = `${containerWidth}px`;
-        container.style.height = `${containerHeight}px`;
-      };
-
-      updateCanvasSize();
-      window.addEventListener('resize', updateCanvasSize);
-
-      const game = new Game(container);
-      gameInstanceRef.current = game;
-      game.start();
-
-      return () => {
-        window.removeEventListener('resize', updateCanvasSize);
-        if (gameInstanceRef.current) {
-          gameInstanceRef.current.stop();
-          gameInstanceRef.current = null;
-        }
-      };
+        return (
+            <LobbyScreen
+            client={clientRef.current}
+            onStartGame={(room: Room) => {
+                setGameRoom(room); // zapisz pokój
+                setScreen('game');
+            }}
+            onLogout={handleLogout}
+            />
+        );
     }
-  }, [screen]);
 
-  if (screen === 'login') {
-    return <LoginRegisterScreen onLogin={handleLogin} />;
-  }
-
-  if (screen === 'lobby') {
-    return <LobbyScreen onStartGame={() => setScreen('game')} onLogout={handleLogout} />;
-  }
-
-  return (
-    <div className="game-wrapper">
-      <div id="pixiContainer" ref={pixiContainerRef}>
-        <GameHUD onLogout={handleGameExit} />
-      </div>
-    </div>
-  );
+    if (screen === 'game') { 
+        return <GameComponent handleExit={handleGameExit}/>; 
+    }
 };
 
 export default App;

@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-import { io, Socket } from "socket.io-client";
 import { Player } from "./pixiPlayer";
 import { Bullet } from "./pixiBullet";
 import { CameraController } from "./CameraController";
@@ -9,7 +8,6 @@ import { initDevtools } from '@pixi/devtools';
 import { Viewport } from 'pixi-viewport';
 import * as Matter from 'matter-js';
 
-const socket: Socket = io('http://localhost:3000');
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
 const collisionLayer = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1")!;
@@ -38,7 +36,6 @@ export class Game {
     mouseX!: number;
     mouseY!: number;
     bullets!: Bullet[];
-    private isRunning: boolean = false;
     private shootSound!: HTMLAudioElement;
 
     private boundHandleMouseDown: (event: MouseEvent) => void;
@@ -59,14 +56,15 @@ export class Game {
                 height: 1080,
                 resolution: window.devicePixelRatio || 1,
                 autoStart: true,
-                antialias: true
+                antialias: true,
+                preference: "webgpu"
             });
 
             initDevtools({ app: this.app });
             containerElement.appendChild(this.app.canvas);
             this.setupCoreSystems();
-            this.setupContainers();
             await this.loadAssets();
+            this.setupContainers();
             this.addPsyhics();
             this.drawMap();
             this.addPlayer();
@@ -98,7 +96,7 @@ export class Game {
         
         // const playerBodyGraphics = new PIXI.Graphics().rect(-25, -75, playerWidth, playerHeight).fill({ r: 0, g: 255, b: 0, a: 0.5 });
 
-        this.player = new Player(socket, 0, playerBottom, this.gameContainer);
+        this.player = new Player(0, playerBottom, this.gameContainer);
 
         Matter.Composite.add(this.world, this.playerBody);
 
@@ -168,7 +166,7 @@ export class Game {
             }
 
             for (const body of bodies) {
-                console.log('DEBUG: Drawing body:', body.label, 'position:', body.position, 'circleRadius:', (body as any).circleRadius);
+                // console.log('DEBUG: Drawing body:', body.label, 'position:', body.position, 'circleRadius:', (body as any).circleRadius);
 
                 // Wypełnienie
                 debugGraphics.beginFill(0x00ff00, 0.4);
@@ -283,20 +281,28 @@ export class Game {
     }
 
     private setupContainers() {
+        this.backgroundSprite = new PIXI.Sprite();
+        this.foregroundSprite = new PIXI.Sprite();
         // Tworzenie kontenerów dla różnych warstw gry
+        this.backgroundSprite.texture = PIXI.Texture.from('background');
+        this.foregroundSprite.texture = PIXI.Texture.from('foreground');
+        this.backgroundSprite.width = 3360;
+        this.backgroundSprite.height = 2538;
+        this.foregroundSprite.width = 3360;
+        this.foregroundSprite.height = 2538;
+
         this.backgroundContainer = new PIXI.Container({label : 'backgroundContainer'});
         this.gameContainer = new PIXI.Container({label : 'gameContainer'});
         this.foregroundContainer = new PIXI.Container({label : 'foregroundContainer'});
         this.testContainer = new PIXI.Container({label: "TEST CONTAINER"});
 
-        // Inicjalizacja sprite'ów dla tła i pierwszego planu
-        this.backgroundSprite = new PIXI.Sprite();
-        this.foregroundSprite = new PIXI.Sprite();
-
         // Dodanie sprite'ów do odpowiednich kontenerów
         this.backgroundContainer.addChild(this.backgroundSprite);
+        this.backgroundContainer.cacheAsTexture(true);
         this.foregroundContainer.addChild(this.foregroundSprite);
+        this.foregroundContainer.cacheAsTexture(true);
 
+        // Kamera
         this.viewport = new Viewport({
             screenWidth: this.app.canvas.width,
             screenHeight: this.app.canvas.height,
@@ -383,13 +389,6 @@ export class Game {
             { alias: 'gun', src: '/1654.png' }
         ]);
 
-        this.backgroundSprite.texture = PIXI.Texture.from('background');
-        this.foregroundSprite.texture = PIXI.Texture.from('foreground');
-        this.backgroundSprite.width = 3360;
-        this.backgroundSprite.height = 2538;
-        this.foregroundSprite.width = 3360;
-        this.foregroundSprite.height = 2538;
-
         // this.player.loadTextures();
         // for (let id in otherPlayers) {
         //     otherPlayers[id].loadTextures();
@@ -430,7 +429,7 @@ export class Game {
             startPos.x + offsetX,
             startPos.y + offsetY,
             this.player.aimAngle,
-            this.player.id,
+            "1",
             this.gameContainer,
             this.world
         );
@@ -465,7 +464,7 @@ export class Game {
                     startPos.x + offsetX,
                     startPos.y + offsetY,
                     this.player.aimAngle,
-                    this.player.id,
+                    "1",
                     this.gameContainer,
                     this.world
                 );
@@ -726,15 +725,9 @@ export class Game {
     //     }
     // }
 
-    start() {
-        this.isRunning = true;
-    }
-
     async stop() {
-        this.isRunning = false;
         this.app.ticker.stop();
         this.removeEventListeners();
-        socket.disconnect();
         this.app.stop();
         this.app.destroy(true);
     }
@@ -784,7 +777,7 @@ export class Game {
                 Matter.Composite.add(this.world, mapElementBody);
             }
         });
-        this.testContainer.addChild(graphics);
+        this.foregroundContainer.addChild(graphics);
     }
 
 
