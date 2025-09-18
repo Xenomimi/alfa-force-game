@@ -61,7 +61,7 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
           placeholder="Wprowadź swój email"
           value={formData.email}
           onChange={handleChange}
-          required
+          // required
         />
 
         <input
@@ -70,7 +70,7 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
           placeholder="Wprowadź hasło"
           value={formData.password}
           onChange={handleChange}
-          required
+          // required
         />
 
         {isRegister && (

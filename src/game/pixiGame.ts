@@ -1,12 +1,16 @@
 import * as PIXI from 'pixi.js';
-import { Player } from "./pixiPlayer";
-import { Bullet } from "./pixiBullet";
-import { CameraController } from "./CameraController";
-import mapData from "../assets/map_data.json";
 import { initDevtools } from '@pixi/devtools';
-
 import { Viewport } from 'pixi-viewport';
 import * as Matter from 'matter-js';
+import { Room, getStateCallbacks } from 'colyseus.js';
+
+import { Player } from "./pixiPlayer";
+import { Bullet } from "./pixiBullet";
+
+import { CameraController } from "./CameraController";
+import mapData from "../assets/map_data.json";
+
+
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -32,23 +36,26 @@ export class Game {
     camera!: CameraController;
     player!: Player;
     playerBody!: Matter.Body;
-    prevPlayerPosition!: { x: number, y: number, mouseX: number, mouseY: number, leftThighAngle: number, rightThighAngle: number, legPhase: number };
     mouseX!: number;
     mouseY!: number;
     bullets!: Bullet[];
+    room: Room<any> | null;
+    roomCallBacks: any;
     private shootSound!: HTMLAudioElement;
-
     private boundHandleMouseDown: (event: MouseEvent) => void;
     private boundHandleMouseUp: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
 
-    constructor(containerElement: HTMLDivElement) {
+    constructor(containerElement: HTMLDivElement, room: Room<any> | null) {
         this.boundHandleMouseDown = this.handleMouseDown.bind(this);
         this.boundHandleMouseUp = this.handleMouseUp.bind(this);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
+        this.room = room;
+        this.roomCallBacks = getStateCallbacks(this.room!);
+
         (async () => {
             this.app = new PIXI.Application(); // ← pierwszy krok
             await this.app.init({
@@ -56,10 +63,8 @@ export class Game {
                 height: 1080,
                 resolution: window.devicePixelRatio || 1,
                 autoStart: true,
-                antialias: true,
-                preference: "webgpu"
+                antialias: true
             });
-
             initDevtools({ app: this.app });
             containerElement.appendChild(this.app.canvas);
             this.setupCoreSystems();
@@ -67,6 +72,8 @@ export class Game {
             this.setupContainers();
             this.addPsyhics();
             this.drawMap();
+            this.addRoomEventHandlers();
+            this.updateOtherPlayers()
             this.addPlayer();
             this.addCamera();
             this.setupEventListeners();
@@ -76,43 +83,110 @@ export class Game {
         })();
     }
 
-    private addPlayer() {
-        const playerHeight = 140;
-        const playerWidth = 36;
-        const playerBottom = playerHeight / 2 ;
+    private addRoomEventHandlers() {
+        this.roomCallBacks(this.room!.state).playerEntities.onAdd((player: any, sessionId: string) => {
+            
+            console.log("Player added:", sessionId, this.room!.sessionId);
+            if (sessionId === this.room!.sessionId) {
+                this.roomCallBacks(player).onChange(() => {
+
+                });
+                console.log("YOU joined:", sessionId);
+            } else {
+                // Tworzymy nowego gracza z pozycją z serwera
+                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true);
+                otherPlayers[sessionId] = newPlayer;
+
+                // Synchronizuj jego pozycję z serwera
+                this.roomCallBacks(player).onChange(() => {
+                    const other = otherPlayers[sessionId];
+                    if (other && other.playerMatterBody) {
+                        // Aktualizuj pozycję ciała fizycznego Matter.js
+                        Matter.Body.setPosition(other.playerMatterBody, {
+                            x: player.x,
+                            y: player.y
+                        });
+
+                        other.dx = player.dx;
+                        other.dy = player.dy;
+                    }
+                });
+                console.log("Other player joined:", sessionId);
+            }
+        });
+
+        this.roomCallBacks(this.room!.state).playerEntities.onRemove((player: any, sessionId: string) => {
+            if (otherPlayers[sessionId]) {
+                // Usuń gracza z kontenera i świata fizyki
+                otherPlayers[sessionId].destroy(); // Zakładam, że masz metodę destroy w klasie Player
+                delete otherPlayers[sessionId];
+            }
+            console.log("Player left:", sessionId);
+        });
+    }
+
+    private updateOtherPlayers() {
+        this.app.ticker.add(() => {
+            for (let id in otherPlayers) {
+                const player = otherPlayers[id];
+                if (player && player.playerMatterBody && player.playerContainer) {
+                    // Synchronizuj pozycję kontenera PIXI z ciałem Matter.js
+                    player.playerContainer.x = player.playerMatterBody.position.x;
+                    player.playerContainer.y = player.playerMatterBody.position.y;
+                    
+                    // Aktualizuj wewnętrzne właściwości gracza
+                    player.x = player.playerContainer.x;
+                    player.y = player.playerContainer.y;
+                    player.updateRemoteHandPositionAngle();
+
+                    // Jeśli gracz ma animację, możesz ją też zaktualizować
+                    if (player._armatureDisplay) {
+                        // Sprawdź czy gracz się porusza na podstawie prędkości
+                        const velocity = player.playerMatterBody.velocity;
+                        const isMoving = Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1;
+                        
+                        if (isMoving && player._armatureDisplay.animation.lastAnimationName !== "run") {
+                            player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+                        } else if (!isMoving && player._armatureDisplay.animation.lastAnimationName !== "idle") {
+                            player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    private addPlayer() {   
+        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
+
         const speedX = 15;
         const jumpVelocity = -20;
-
-        this.playerBody = Matter.Bodies.rectangle(820, 300, playerWidth, playerHeight, {
-            label: 'player',
-            inertia: Infinity,
-            friction: 0.05,
-            frictionStatic: 0,
-            frictionAir: 0.02,
-            restitution: 0,
-            mass: 1
-        });
-        
-        
-        // const playerBodyGraphics = new PIXI.Graphics().rect(-25, -75, playerWidth, playerHeight).fill({ r: 0, g: 255, b: 0, a: 0.5 });
-
-        this.player = new Player(0, playerBottom, this.gameContainer);
-
-        Matter.Composite.add(this.world, this.playerBody);
-
-        // this.testContainer.addChild(playerBodyGraphics);
 
         // Aktualizacje gracza
         this.app.ticker.add(() => {
             if (!this.player._armatureDisplay) return;
             let moving = false;
-            this.player.playerContainer.x = this.playerBody.position.x;
-            this.player.playerContainer.y = this.playerBody.position.y;
+            // Synchronizacja pozycji gracza, kontenera PIXI oraz ciała Matter.js
+            this.player.x = this.player.playerContainer.x = Math.round(this.player.playerMatterBody.position.x);
+            this.player.y = this.player.playerContainer.y = Math.round(this.player.playerMatterBody.position.y);
             // playerBodyGraphics.x = this.playerBody.position.x;
             // playerBodyGraphics.y = this.playerBody.position.y;
             // playerBodyGraphics.rotation = this.playerBody.angle;
 
-            let velocity = { x: this.playerBody.velocity.x, y: this.playerBody.velocity.y };
+            if (this.player.x !== this.player.prevPlayerPosition.x || 
+                this.player.y !== this.player.prevPlayerPosition.y ||
+                this.player.dx !== this.player.prevPlayerPosition.dx ||
+                this.player.dy !== this.player.prevPlayerPosition.dy) {
+                
+                this.room?.send("move", { x: this.player.x, y: this.player.y, dx: this.player.dx, dy: this.player.dy });
+
+                this.player.prevPlayerPosition.x = this.player.x;
+                this.player.prevPlayerPosition.y = this.player.y;
+                this.player.prevPlayerPosition.dx = this.player.dx;
+                this.player.prevPlayerPosition.dy = this.player.dy;
+            }
+
+            let velocity = { x: this.player.playerMatterBody.velocity.x, y: this.player.playerMatterBody.velocity.y };
             if (keysPressed['a']) {
                 velocity.x = -speedX;
                 moving = true;
@@ -123,7 +197,7 @@ export class Game {
                 moving = true;
             }
             if (keysPressed['w']) {
-                velocity.y = jumpVelocity; 
+                velocity.y = jumpVelocity;
             }
             
             if (!moving) {
@@ -141,7 +215,7 @@ export class Game {
             this.camera.setMouse(this.mouseX, this.mouseY);
             this.camera.update(this.app.ticker.deltaMS / 1000);
             this.updateBullets();
-            Matter.Body.setVelocity(this.playerBody, velocity);
+            Matter.Body.setVelocity(this.player.playerMatterBody, velocity);
         });
     }
 
@@ -241,14 +315,13 @@ export class Game {
 
         this.engine = Matter.Engine.create({
             gravity: { x: 0, y: 2.5 },
-            positionIterations: 6,
-            velocityIterations: 4,
-            constraintIterations: 2
+            // positionIterations: 6,
+            // velocityIterations: 4,
+            // constraintIterations: 2
         });
 
 
         this.world = this.engine.world;
-        console.log("TICKER DELTA", this.app.ticker.deltaMS);
         Matter.Runner.run(this.engine);
         this.app.ticker.add(() => {
             Matter.Engine.update(this.engine, this.app.ticker.deltaMS);
@@ -328,7 +401,7 @@ export class Game {
     }
 
     private addCamera() {
-        this.camera = new CameraController(this.viewport, this.playerBody);
+        this.camera = new CameraController(this.viewport, this.player.playerMatterBody);
     }
 
     private setupFPSCounter() {
@@ -362,7 +435,7 @@ export class Game {
 
     private setupCoreSystems() {
         this.app.stage.eventMode = 'dynamic';
-
+        console.log("GAME : ", this.room);
         // this.prevPlayerPosition = {
         //     x: this.player.x,
         //     y: this.player.y,
@@ -492,156 +565,6 @@ export class Game {
         }
     }
 
-    // setupSocketListeners() {
-    //     socket.on('player_health_update', (data: { playerId: string, health: number }) => {
-    //         if (data.playerId === this.player.id) {
-    //             this.player.health = data.health;
-    //         } else if (otherPlayers[data.playerId]) {
-    //             otherPlayers[data.playerId].health = data.health;
-    //         }
-    //     });
-
-    //     socket.on('player_move', (data) => {
-    //         if (otherPlayers[data.id]) {
-    //             otherPlayers[data.id].x = data.x;
-    //             otherPlayers[data.id].y = data.y;
-    //         }
-    //     });
-
-    //     socket.on('player_mouse_move', (data) => {
-    //         if (otherPlayers[data.id]) {
-    //             otherPlayers[data.id].mouseX = data.handX;
-    //             otherPlayers[data.id].mouseY = data.handY;
-    //         }
-    //     });
-
-    //     socket.on('player_respawned', (data) => {
-    //         if (data.playerId === this.player.id) {
-    //             this.player.health = data.health;
-    //             this.player.isAlive = data.isAlive;
-    //             this.player.x = data.x;
-    //             this.player.y = data.y;
-    //             this.player.leftThighAngle = data.leftThighAngle;
-    //             this.player.rightThighAngle = data.rightThighAngle;
-    //             this.player.legPhase = data.legPhase;
-    //             this.player.headHitbox = data.headHitbox;
-    //             this.player.torsoHitbox = data.torsoHitbox;
-    //             this.player.legHitbox = data.legHitbox;
-    //         } else if (otherPlayers[data.playerId]) {
-    //             otherPlayers[data.playerId].health = data.health;
-    //             otherPlayers[data.playerId].isAlive = data.isAlive;
-    //             otherPlayers[data.playerId].x = data.x;
-    //             otherPlayers[data.playerId].y = data.y;
-    //             otherPlayers[data.playerId].leftThighAngle = data.leftThighAngle;
-    //             otherPlayers[data.playerId].rightThighAngle = data.rightThighAngle;
-    //             otherPlayers[data.playerId].legPhase = data.legPhase;
-    //             otherPlayers[data.playerId].headHitbox = data.headHitbox;
-    //             otherPlayers[data.playerId].torsoHitbox = data.torsoHitbox;
-    //             otherPlayers[data.playerId].legHitbox = data.legHitbox;
-    //         }
-    //     });
-
-    //     socket.on('current_players', (players) => {
-    //         for (let id in players) {
-    //             if (id === socket.id) {
-    //                 this.player.id = id;
-    //                 this.player.playerName = players[id].playerName;
-    //                 this.player.x = players[id].x;
-    //                 this.player.y = players[id].y;
-    //                 this.player.mouseX = players[id].handX;
-    //                 this.player.mouseY = players[id].handY;
-    //                 this.player.headHitbox = players[id].headHitbox;
-    //                 this.player.torsoHitbox = players[id].torsoHitbox;
-    //                 this.player.legHitbox = players[id].legHitbox;
-    //                 this.camera.follow(this.player);
-    //             } else {
-    //                 if (!otherPlayers[id]) {
-    //                     otherPlayers[id] = new Player(socket, players[id].x, players[id].y, this.camera, this.container);
-    //                     otherPlayers[id].loadTextures();
-    //                 }
-    //                 otherPlayers[id].id = id;
-    //                 otherPlayers[id].playerName = players[id].playerName;
-    //                 otherPlayers[id].x = players[id].x;
-    //                 otherPlayers[id].y = players[id].y;
-    //                 otherPlayers[id].mouseX = players[id].handX;
-    //                 otherPlayers[id].mouseY = players[id].handY;
-    //                 otherPlayers[id].headHitbox = players[id].headHitbox;
-    //                 otherPlayers[id].torsoHitbox = players[id].torsoHitbox;
-    //                 otherPlayers[id].legHitbox = players[id].legHitbox;
-    //             }
-    //         }
-    //     });
-
-    //     socket.on('update_position', (data) => {
-    //         if (data.id !== socket.id && otherPlayers[data.id]) {
-    //             const player = otherPlayers[data.id];
-    //             player.x = data.x;
-    //             player.y = data.y;
-    //             player.leftThighAngle = data.leftThighAngle;
-    //             player.rightThighAngle = data.rightThighAngle;
-    //             player.legPhase = data.legPhase;
-    //             player.headHitbox.x = data.headHitbox.x;
-    //             player.headHitbox.y = data.headHitbox.y;
-    //             player.torsoHitbox.x = data.torsoHitbox.x;
-    //             player.torsoHitbox.y = data.torsoHitbox.y;
-    //             player.legHitbox.x = data.legHitbox.x;
-    //             player.legHitbox.y = data.legHitbox.y;
-    //         }
-    //     });
-
-    //     socket.on('update_mouse_position', (data) => {
-    //         if (data.id !== socket.id && otherPlayers[data.id]) {
-    //             otherPlayers[data.id].mouseX = data.handX;
-    //             otherPlayers[data.id].mouseY = data.handY;
-    //         }
-    //     });
-
-    //     socket.on('new_bullet', (data: { x: number, y: number, targetX: number, targetY: number, playerId: string }) => {
-    //         const bullet = new Bullet(
-    //             data.x,
-    //             data.y,
-    //             data.targetX,
-    //             data.targetY,
-    //             data.playerId,
-    //             collisionChecker,
-    //             this.container
-    //         );
-    //         this.bullets.push(bullet);
-    //     });
-
-    //     socket.on('bullet_removed', (data: { index: number, playerId: string }) => {
-    //         this.bullets = this.bullets.filter(bullet => 
-    //             !(bullet.playerId === data.playerId && 
-    //               bullet.isOffscreen(3360, 2538))
-    //         );
-    //     });
-
-    //     socket.on('player_died', (data) => {
-    //         const { playerId, killerId, deathTime } = data;
-    //         if (playerId === this.player.id) {
-    //             this.player.isAlive = false;
-    //             this.player.deathTime = deathTime;
-    //             this.player.killerId = killerId;
-    //             this.player.deathAnimation.active = true;
-    //             this.player.deathAnimation.progress = 0;
-    //         } else if (otherPlayers[playerId]) {
-    //             const deadPlayer = otherPlayers[playerId];
-    //             deadPlayer.isAlive = false;
-    //             deadPlayer.deathTime = deathTime;
-    //             deadPlayer.killerId = killerId;
-    //             deadPlayer.deathAnimation.active = true;
-    //             deadPlayer.deathAnimation.progress = 0;
-    //         }
-    //     });
-
-    //     socket.on('player_disconnected', (data: { id: string }) => {
-    //         if (otherPlayers[data.id]) {
-    //             otherPlayers[data.id].destroy();
-    //             delete otherPlayers[data.id];
-    //         }
-    //     });
-    // }
-
     setupEventListeners() {
         document.addEventListener('keydown', this.boundHandleKeyDown);
         document.addEventListener('keyup', this.boundHandleKeyUp);
@@ -683,47 +606,6 @@ export class Game {
             this.shootingInterval = null;
         }
     }
-
-    // checkAndEmitPosition() {
-    //     if (!this.player.isAlive) return;
-
-    //     const positionChanged = this.player.x !== this.prevPlayerPosition.x || 
-    //                             this.player.y !== this.prevPlayerPosition.y;
-    //     const legsChanged = this.player.leftThighAngle !== this.prevPlayerPosition.leftThighAngle || 
-    //                         this.player.rightThighAngle !== this.prevPlayerPosition.rightThighAngle || 
-    //                         this.player.legPhase !== this.prevPlayerPosition.legPhase;
-
-    //     if (positionChanged || legsChanged) {
-    //         socket.emit('player_move', {
-    //             x: this.player.x, 
-    //             y: this.player.y,
-    //             leftThighAngle: this.player.leftThighAngle,
-    //             rightThighAngle: this.player.rightThighAngle,
-    //             legPhase: this.player.legPhase,
-    //             headHitbox: { x: this.player.headHitbox.x, y: this.player.headHitbox.y },
-    //             torsoHitbox: { x: this.player.torsoHitbox.x, y: this.player.torsoHitbox.y },
-    //             legHitbox: { x: this.player.legHitbox.x, y: this.player.legHitbox.y }
-    //         });
-
-    //         this.prevPlayerPosition.x = this.player.x;
-    //         this.prevPlayerPosition.y = this.player.y;
-    //         this.prevPlayerPosition.leftThighAngle = this.player.leftThighAngle;
-    //         this.prevPlayerPosition.rightThighAngle = this.player.rightThighAngle;
-    //         this.prevPlayerPosition.legPhase = this.player.legPhase;
-    //     }
-
-    //     if (this.player.mouseX !== this.prevPlayerPosition.mouseX ||
-    //         this.player.mouseY !== this.prevPlayerPosition.mouseY) {
-    //         const worldMouseX = this.player.mouseX + this.camera.xView;
-    //         const worldMouseY = this.player.mouseY + this.camera.yView;
-    //         socket.emit('player_mouse_move', {
-    //             handX: worldMouseX,
-    //             handY: worldMouseY    
-    //         });
-    //         this.prevPlayerPosition.mouseX = this.player.mouseX;
-    //         this.prevPlayerPosition.mouseY = this.player.mouseY;
-    //     }
-    // }
 
     async stop() {
         this.app.ticker.stop();

@@ -31,7 +31,6 @@ const App: React.FC = () => {
     };
 
     const handleGameExit = async () => {
-        console.log("XAPP: handleGameExit called");
         try {
             console.log(gameRoom);
             if (gameRoom) {
@@ -39,7 +38,6 @@ const App: React.FC = () => {
                 setGameRoom(null);
             }
             setScreen('lobby')
-        console.log("Opuściłeś pokój");
         } catch (err) {
         console.error("Błąd przy opuszczaniu pokoju:", err);
         }
@@ -79,7 +77,7 @@ const App: React.FC = () => {
     }
 
     if (screen === 'game') { 
-        return <GameComponent handleExit={handleGameExit}/>; 
+        return <GameComponent gameRoom={gameRoom} handleExit={handleGameExit}/>; 
     }
 };
 

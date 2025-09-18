@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import { PixiArmatureDisplay, PixiFactory, Armature } from 'dragonbones-pixijs';
+import * as Matter from 'matter-js';
 
 type ArmatureDisplayType = PixiArmatureDisplay;
 
@@ -10,12 +11,13 @@ export class Player {
     _armatureDisplay!: ArmatureDisplayType;
     _armature!: Armature;
     viewport!: Viewport;
-    // id: string;
-    // socket: Socket;
+    id: string | undefined;
     x: number;
     y: number;
+    prevPlayerPosition!: { x: number, y: number, mouseX: number, mouseY: number, dx: number, dy: number };
     width: number;
     height: number;
+    bottom: number;
     // playerName: string;
     shootingPointOffsetX: number = 60;
     speed: number;
@@ -24,6 +26,8 @@ export class Player {
     isAlive: boolean;
     handAngle: number;
     aimAngle: number;
+    dx: number;
+    dy: number;
     // health: number;
     // maxHealth: number;
     // deathAnimation: {
@@ -36,13 +40,19 @@ export class Player {
     imagesLoaded: boolean = false;
     playerContainer: PIXI.Container;
     factory: PixiFactory;
+    playerMatterBody: Matter.Body;
+    psyhicsWorld: Matter.World;
 
-    constructor(x: number, y: number, parentContainer: PIXI.Container) {
-        // this.socket = socket;
+    constructor(id: string | undefined, x: number, y: number, parentContainer: PIXI.Container, psyhicsWorld: Matter.World, gravity: boolean = true) {
         // this.id = socket.id ?? "PlayerName";
-        this.x = x;
-        this.y = y;
         this.isAlive = true;
+        this.id = id;
+        this.width = 36;
+        this.height = 140;
+        this.bottom = this.height / 2;
+        this.x = x;
+        this.y = y - this.bottom; 
+        this.prevPlayerPosition = { x: this.x, y: this.y, mouseX: 0, mouseY: 0, dx: 0, dy: 0 };
         // this.playerName = this.id;
         // this.color = 'rgb(255, 0, 0, 0.5)';
         this.speed = 4;
@@ -50,6 +60,9 @@ export class Player {
         this.verticalSpeed = 0;
         this.aimAngle = 0;
         this.handAngle = 0;
+        this.dx = 0;
+        this.dy = 0;
+        this.psyhicsWorld = psyhicsWorld;
         // this.maxHealth = 100;
         // this.health = this.maxHealth;
         // this.isAlive = true;
@@ -59,18 +72,28 @@ export class Player {
         //     duration: 1000
         // };
         // this.deathTime = 100;
+        this.playerMatterBody = Matter.Bodies.rectangle(this.x, this.y, this.width, this.height, {
+            label: 'player',
+            inertia: Infinity,
+            friction: 0.05,
+            frictionStatic: 0,
+            frictionAir: 0.02,
+            restitution: 0,
+            mass: 1
+        });
+        Matter.Composite.add(psyhicsWorld, this.playerMatterBody);
 
+        this.playerMatterBody.ignoreGravity = gravity;
         this.playerContainer = new PIXI.Container();
-        parentContainer.addChild(this.playerContainer);
         this.factory = PixiFactory.factory; 
 
         
         this.init(this.playerContainer);
-
-        this.width = 30;
-        this.height = 60;
-
+        this.drawPlayerName();
+        parentContainer.addChild(this.playerContainer);
     }
+
+    
 
     private async init(playerContainer: PIXI.Container) {
         // this.initializeHitboxes();
@@ -79,8 +102,7 @@ export class Player {
 
         this._armatureDisplay = await PixiFactory.factory.buildArmatureDisplay("Armature")!;
         this._armature = await this._armatureDisplay.armature;
-        this._armatureDisplay.x = this.x;
-        this._armatureDisplay.y = this.y;
+        this._armatureDisplay.y = this.bottom;
         this._armatureDisplay.debugDraw = false;
         this._armatureDisplay.scale.set(2);
         this._armatureDisplay.animation.play("idle");
@@ -121,14 +143,14 @@ export class Player {
         const boneInViewport = viewport.toLocal(boneGlobal);
 
         // liczymy wektor do myszy (która też jest w viewport space)
-        const dx = mouseX - boneInViewport.x;
-        const dy = mouseY - boneInViewport.y;
+        this.dx = mouseX - boneInViewport.x;
+        this.dy = mouseY - boneInViewport.y;
 
-        const aimAngle = Math.atan2(dy, dx);
+        const aimAngle = Math.atan2(this.dy, this.dx);
         this.aimAngle = aimAngle; // nowa zmienna przechowująca kąt do strzału
 
         // ustawiamy flipX na podstawie kierunku myszy
-        this._armatureDisplay.armature.flipX = dx < 0;
+        this._armatureDisplay.armature.flipX = this.dx < 0;
 
         this.handAngle = aimAngle;
 
@@ -142,6 +164,31 @@ export class Player {
         bone.offset.rotation = this.handAngle;
         bone.invalidUpdate();
     }
+
+    updateRemoteHandPositionAngle(): void {
+        if (!this._armature || !this._armatureDisplay) return;
+        const bone = this._armature.getBone("forearm");
+        if (!bone) return;
+
+        const aimAngle = Math.atan2(this.dy, this.dx);
+        this.aimAngle = aimAngle; // nowa zmienna przechowująca kąt do strzału
+
+        // ustawiamy flipX na podstawie kierunku myszy
+        this._armatureDisplay.armature.flipX = this.dx < 0;
+
+        this.handAngle = aimAngle;
+
+        // jeśli flip = true, odwracamy kąt
+        if (this._armatureDisplay.armature.flipX) {
+            this.handAngle = Math.PI - this.aimAngle;
+            if (this.handAngle > Math.PI) this.handAngle -= Math.PI * 2;
+        }
+
+        // ustawiamy rotację na kości
+        bone.offset.rotation = this.handAngle;
+        bone.invalidUpdate();
+    }
+
 
     async setGun(armature: Armature) {
         const slot = armature.getSlot('bone')!;
@@ -267,21 +314,34 @@ export class Player {
 //         this.verticalSpeed = 0;
 //     }
 
-//     drawPlayerName() {
-//         const nameWidth = this.width + 50;
-//         const nameX = this.width / 2 - nameWidth / 2;
-//         const nameY = -50;
+    drawPlayerName() {
+        const nameY = this.bottom - this.height - 15;
 
-//         const text = new PIXI.Text(`${this.playerName}`, {
-//             fontFamily: 'Arial',
-//             fontSize: 12,
-//             fill: 0xFF00DD
-//         });
-//         text.x = nameX + nameWidth / 2;
-//         text.y = nameY + 10;
-//         text.anchor.set(0.5);
-//         this.container.addChild(text);
-//     }
+        const text = new PIXI.Text({
+            text: this.id,
+            style: {
+                fontFamily: 'Arial',
+                fontSize: 20,
+                fill: 0xFFFFFF
+            }
+        });
+        text.y = nameY;
+        text.anchor.set(0.5);
+        this.playerContainer.addChild(text);
+    }
+    destroy() {
+        if (this.playerMatterBody && this.psyhicsWorld) {
+            Matter.Composite.remove(this.psyhicsWorld, this.playerMatterBody);
+        }
+        
+        if (this.playerContainer && this.playerContainer.parent) {
+            this.playerContainer.parent.removeChild(this.playerContainer);
+        }
+        
+        if (this._armatureDisplay) {
+            this._armatureDisplay.dispose();
+        }
+    }
 
 //     drawHealthBar() {
 // const barWidth = this.width + 30;

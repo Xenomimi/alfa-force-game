@@ -10,7 +10,7 @@ import PlayerProfile from '../Profile/PlayerProfile';
 import ShopScreen from '../Shop/ShopScreen';
 import LeadersScreen from '../Ranking/LeadersScreen';
 import Settings from '../Settings/Settings';
-import { Client, Room } from 'colyseus.js';
+import { Client, Room, RoomAvailable } from 'colyseus.js';
 import { on } from 'events';
 import { join } from 'path';
 
@@ -28,6 +28,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
   const [connStatus, setConnStatus] = useState('Brak połączenia');
   const lobby = useRef<Room | null>(null);
   const joinedRoom = useRef<Room | null>(null);
+  const [numberOfPlayers, setNumberOfPlayers] = useState(null);
+  let allRooms: RoomAvailable[] = [];
 
   const activeGames = [
     { name: 'Industrial Zone', mode: 'Deathmatch', players: '8/12', ping: '45ms' },
@@ -50,9 +52,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
   const createRoom = async () => {
     if (!lobby) return;
     try {
-      console.log("Tworzenie nowego pokoju...");
       const newRoom = await client!.create("player_room", { map: "Industrial Zone" });
-      console.log("Stworzono nowy pokój:", newRoom);
       onStartGame(newRoom);
       
     } catch (err) {
@@ -62,10 +62,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
 
   const joinRoom = async (roomId: string) => {
     try {
-      console.log("Dołączanie do pokoju:", roomId);
       joinedRoom.current = await client!.joinById(roomId);
       onStartGame(joinedRoom.current);
-      console.log("Dołączono do pokoju:", joinedRoom);
     } catch (err) {
       console.error("Błąd przy dołączaniu do pokoju:", err);
     }
@@ -74,16 +72,16 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
   const connect = async () => {
     try {
       // tworzenie lobby
-      lobby.current = await client!.joinOrCreate("lobby");
-
+      if (!lobby.current) {
+        lobby.current = await client!.joinOrCreate("lobby");
+      }
+        
       // nasłuchiwanie eventów
       lobby.current!.onMessage("rooms", (rooms: any[]) => {
         setRooms(rooms);
-        console.log("Dostępne pokoje:", rooms);
         setConnStatus("Połączono z serwerem");
       });
       lobby.current!.onMessage("+", ([roomId, room]) => {
-        console.log("Nowy pokój dodany:", roomId, room);
         setRooms((prev) => {
           const exists = prev.find((r) => r.roomId === roomId);
           if (exists) {
@@ -97,9 +95,10 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
           }
         });
       });
-      lobby.current!.onMessage("-", (roomId) =>
+      lobby.current!.onMessage("-", (roomId) => {
         setRooms((prev) => prev.filter((r) => r.roomId !== roomId))
-      );
+      });
+      lobby.current!.onMessage("numberOfPlayers", (data) => setNumberOfPlayers(data.message));
     } 
     catch (err) {
       console.error("LOBBY SCREEN❌ Błąd przy łączeniu z lobby:", err);
@@ -108,11 +107,12 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
   }
 
   useEffect(() => {
-
       connect();
 
       return () => {
         lobby.current?.removeAllListeners();
+        lobby.current?.leave();
+        // lobby.current = null;
       };
   }, []);
 
@@ -224,10 +224,12 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
               </div>
                 <ul className="games-list">
                   {rooms.length > 0 ? (
+                    console.log("ROOMS TO RENDER:", rooms),
                     rooms.map((room, index) => (
                       <li key={index} className="game-item">
                         <span className="map-name">{room.name}</span>
                         <span className="map-name">{room.roomId}</span>
+                        {/* <span className="map-name">{Object.keys(room)}</span> */}
                         <button onClick={() => joinRoom(room.roomId)} className="join-btn">DOŁĄCZ</button>
                       </li>
                     ))
@@ -249,6 +251,13 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
           <aside className="right-sidebar">
             <div className="map-preview">
               <h3>Status: <p style={{ color: connStatus != 'Brak połączenia' ? 'green': 'red'}}>{connStatus}</p></h3>
+            </div>
+            <div className="map-preview">
+              <h3>Gracze online: 
+                <p style={{ color:'green', fontSize: 40}}>
+                  {numberOfPlayers + rooms.reduce((sum, room) => sum + (room.clients || 0), 0)}
+                </p>
+              </h3>
             </div>
             <div className="map-preview">
               <h3>Nazwa załączonej mapy</h3>

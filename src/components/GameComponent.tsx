@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import GameHUD from './Hud/GameHUD.tsx';
 import { Game } from '../game/pixiGame.ts';
+import { Room } from 'colyseus.js';
 
 interface GameProps {
+    gameRoom: Room | null;
     handleExit: () => void;
 }
 
-const GameComponent: React.FC<GameProps> = ({ handleExit }) => { 
+const GameComponent: React.FC<GameProps> = ({ gameRoom, handleExit }) => { 
     const gameInstanceRef = useRef<Game | null>(null);
     const pixiContainerRef = useRef<HTMLDivElement>(null);
     
@@ -45,7 +47,7 @@ const GameComponent: React.FC<GameProps> = ({ handleExit }) => {
             updateCanvasSize(container);
             window.addEventListener('resize', updateCanvasSize.bind(null, container));
 
-            const game = new Game(container);
+            const game = new Game(container, gameRoom);
             gameInstanceRef.current = game;
 
             return () => {
