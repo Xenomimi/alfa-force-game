@@ -20,8 +20,10 @@ Players control characters equipped with futuristic armor and weapons, competing
 
 - **TypeScript**: Primary language for creating client-side game logic.
 - **Node.js**: Server for handling multiplayer functionality and game state synchronization.
-- **Canvas API**: For rendering game elements and visual effects.
-- **WebSocket**: For real-time communication between players and the server.
+- **Pixi**: For rendering game elements and visual effects.
+- **Matter** For handling physics.
+- **Colyseus**: For real-time communication between players and the server.
+- **DragonBones** For player animations
 - **React**: For handling the front-end.
 - **MongoDB**: For storing player account data.
 

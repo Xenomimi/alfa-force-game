@@ -79,7 +79,11 @@ export class Player {
             frictionStatic: 0,
             frictionAir: 0.02,
             restitution: 0,
-            mass: 1
+            mass: 1,
+            collisionFilter: {
+                category: 0x0002, // kategoria gracza
+                mask: 0xFFFF ^ 0x0002 // koliduje ze wszystkimi oprócz graczy
+            }
         });
         Matter.Composite.add(psyhicsWorld, this.playerMatterBody);
 

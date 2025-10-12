@@ -11,8 +11,6 @@ import ShopScreen from '../Shop/ShopScreen';
 import LeadersScreen from '../Ranking/LeadersScreen';
 import Settings from '../Settings/Settings';
 import { Client, Room, RoomAvailable } from 'colyseus.js';
-import { on } from 'events';
-import { join } from 'path';
 
 export type Section = 'rozgrywki' | 'profil' | 'sklep' | 'liderzy' | 'ustawienia';
 
@@ -29,7 +27,6 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
   const lobby = useRef<Room | null>(null);
   const joinedRoom = useRef<Room | null>(null);
   const [numberOfPlayers, setNumberOfPlayers] = useState(null);
-  let allRooms: RoomAvailable[] = [];
 
   const activeGames = [
     { name: 'Industrial Zone', mode: 'Deathmatch', players: '8/12', ping: '45ms' },
@@ -38,11 +35,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
     { name: 'Sniper Valley', mode: 'Deathmatch', players: '3/8', ping: '23ms' },
     { name: 'City Ruins', mode: 'Deathmatch', players: '4/10', ping: '155ms' },
   ];
-  const recentActivities = [
-    { icon: '🏆', text: 'Awans na poziom 11' },
-    { icon: '💰', text: 'Zdobyto 100 monet' },
-    { icon: '💀', text: 'Pokonano 5 przeciwników' },
-  ];
+
 
   const handleNavigate = (s: Section) => {
     setActiveSection(s);

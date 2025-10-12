@@ -44,11 +44,7 @@ export class Bullet {
             isSensor: true,
             label: "bullet",
             inertia: Infinity,
-            frictionAir: 0,
-            collisionFilter: {
-                category: 0x0002,
-                mask: 0x0001
-            }
+            frictionAir: 0
         });
 
         this.bulletBody.ignoreGravity = true;
@@ -90,5 +86,6 @@ export class Bullet {
         this.parentContainer.removeChild(this.graphics);
         this.graphics.destroy();
         Matter.World.remove(this.physicsWorld, this.bulletBody);
+        
     }
 }

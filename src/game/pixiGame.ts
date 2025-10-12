@@ -78,7 +78,7 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            this.drawDebugBodies();
+            // this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }
@@ -88,9 +88,9 @@ export class Game {
             
             console.log("Player added:", sessionId, this.room!.sessionId);
             if (sessionId === this.room!.sessionId) {
-                this.roomCallBacks(player).onChange(() => {
+                // this.roomCallBacks(player).onChange(() => {
 
-                });
+                // });
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
@@ -118,10 +118,47 @@ export class Game {
         this.roomCallBacks(this.room!.state).playerEntities.onRemove((player: any, sessionId: string) => {
             if (otherPlayers[sessionId]) {
                 // Usuń gracza z kontenera i świata fizyki
-                otherPlayers[sessionId].destroy(); // Zakładam, że masz metodę destroy w klasie Player
+                otherPlayers[sessionId].destroy();
                 delete otherPlayers[sessionId];
             }
             console.log("Player left:", sessionId);
+        });
+
+        // Obługa zdarzeń dla pocisków
+        this.roomCallBacks(this.room!.state).bulletEntities.onAdd((bullet: any) => {
+
+            // Synchronizacja pozycji pocisków innych graczy
+            if (bullet.playerId !== this.player.id) {
+                const newBullet = new Bullet(
+                    bullet.x,
+                    bullet.y,
+                    bullet.aimAngle,
+                    bullet.playerId,
+                    this.gameContainer,
+                    this.world
+                );
+                this.bullets.push(newBullet);
+            }
+            //  else {
+            //     // Synchronizuj jego pozycję z serwera
+            //     this.roomCallBacks(player).onChange(() => {
+            //         const other = otherPlayers[sessionId];
+            //         if (other && other.playerMatterBody) {
+            //             // Aktualizuj pozycję ciała fizycznego Matter.js
+            //             Matter.Body.setPosition(other.playerMatterBody, {
+            //                 x: player.x,
+            //                 y: player.y
+            //             });
+
+            //             other.dx = player.dx;
+            //             other.dy = player.dy;
+            //         }
+            //     });
+            // }
+        });
+
+        this.roomCallBacks(this.room!.state).bulletEntities.onRemove((bullet: any, bulletId: string) => {
+            console.log("Bullet removed:", bulletId);
         });
     }
 
@@ -161,6 +198,8 @@ export class Game {
 
         const speedX = 15;
         const jumpVelocity = -20;
+
+
 
         // Aktualizacje gracza
         this.app.ticker.add(() => {
@@ -218,6 +257,80 @@ export class Game {
             Matter.Body.setVelocity(this.player.playerMatterBody, velocity);
         });
     }
+
+    // private addPlayer() {   
+    //     this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
+
+    //     const speedX = 15;
+    //     const jumpVelocity = -20;
+
+    //     // Obiekt trzymający poprzedni stan inputów, żeby wysyłać tylko zmiany
+    //     let prevInput = { left: false, right: false, jump: false };
+
+    //     this.app.ticker.add(() => {
+    //         if (!this.player._armatureDisplay) return;
+
+    //         // --- 1. Odczyt inputów ---
+    //         const input = {
+    //             left: keysPressed['a'] || false,
+    //             right: keysPressed['d'] || false,
+    //             jump: keysPressed['w'] || false
+    //         };
+
+    //         // --- 2. Wysyłanie inputów do serwera tylko jeśli się zmieniły ---
+    //         if (input.left !== prevInput.left || input.right !== prevInput.right || input.jump !== prevInput.jump) {
+    //             this.room?.send("input", input);
+    //             prevInput = { ...input };
+    //         }
+
+    //         // --- 3. Predykcja lokalna (client-side prediction) ---
+    //         let velocity = { x: this.player.playerMatterBody.velocity.x, y: this.player.playerMatterBody.velocity.y };
+
+    //         if (input.left) velocity.x = -speedX;
+    //         else if (input.right) velocity.x = speedX;
+    //         else velocity.x *= 0.9; // hamowanie jeśli brak ruchu
+
+    //         if (input.jump) velocity.y = jumpVelocity;
+
+    //         Matter.Body.setVelocity(this.player.playerMatterBody, velocity);
+
+    //         // --- 4. Interpolacja pozycji do stanu z serwera ---
+    //         const serverPlayer = this.room?.state.playerEntities.get(this.player.id);
+    //         if (serverPlayer) {
+    //             const diffX = serverPlayer.x - this.player.playerMatterBody.position.x;
+    //             const diffY = serverPlayer.y - this.player.playerMatterBody.position.y;
+
+    //             Matter.Body.setPosition(this.player.playerMatterBody, {
+    //                 x: this.player.playerMatterBody.position.x + diffX * 0.2, // interpolacja 20%
+    //                 y: this.player.playerMatterBody.position.y + diffY * 0.2
+    //             });
+    //         }
+
+    //         // --- 5. Aktualizacja Pixi ---
+    //         this.player.playerContainer.x = this.player.playerMatterBody.position.x;
+    //         this.player.playerContainer.y = this.player.playerMatterBody.position.y;
+
+    //         // Animacje
+    //         const moving = input.left || input.right;
+    //         if (moving) {
+    //             if (this.player._armatureDisplay.animation.lastAnimationName !== "run") {
+    //                 this.player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+    //             }
+    //         } else {
+    //             if (this.player._armatureDisplay.animation.lastAnimationName !== "idle") {
+    //                 this.player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+    //             }
+    //         }
+
+    //         // --- 6. Kamera i ręce ---
+    //         this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
+    //         this.camera.setMouse(this.mouseX, this.mouseY);
+    //         this.camera.update(this.app.ticker.deltaMS / 1000);
+
+    //         // --- 7. Predykcja pocisków ---
+    //         this.updateBullets(); 
+    //     });
+    // }
 
     private drawDebugBodies() {
         this.app.stage.sortableChildren = true;
@@ -307,7 +420,6 @@ export class Game {
                 if (body.isStatic || body.isSleeping || body.ignoreGravity)
                     continue;
 
-                // add the resultant force of gravity
                 body.force.y += body.mass * gravity.y * gravityScale;
                 body.force.x += body.mass * gravity.x * gravityScale;
             }
@@ -320,13 +432,11 @@ export class Game {
             // constraintIterations: 2
         });
 
-
         this.world = this.engine.world;
-        Matter.Runner.run(this.engine);
+
         this.app.ticker.add(() => {
             Matter.Engine.update(this.engine, this.app.ticker.deltaMS);
         }, undefined, PIXI.UPDATE_PRIORITY.HIGH);
-
 
         // Zdarzenia kolizji
         Matter.Events.on(this.engine, "collisionStart", (event) => {
@@ -348,6 +458,9 @@ export class Game {
                 if (b.label === "bullet" && a.label === "player") {
                     console.log("Hit player", a.id);
                     (b as any).bulletRef.hasCollided = true;
+                }
+                if(a.label === "player" && b.label === "player") {
+                    console.log("Player bump");
                 }
             }
         });
@@ -435,23 +548,11 @@ export class Game {
 
     private setupCoreSystems() {
         this.app.stage.eventMode = 'dynamic';
-        console.log("GAME : ", this.room);
-        // this.prevPlayerPosition = {
-        //     x: this.player.x,
-        //     y: this.player.y,
-        //     mouseX: this.player.mouseX,
-        //     mouseY: this.player.mouseY,
-        //     leftThighAngle: this.player.leftThighAngle,
-        //     rightThighAngle: this.player.rightThighAngle,
-        //     legPhase: this.player.legPhase
-        // };
         this.mouseX = 0;
         this.mouseY = 0;
         this.bullets = [];
         this.shootSound = new Audio('/snd_weapon_64.mp3');
         this.shootSound.volume = 0.05;
-
-        // this.setupSocketListeners();
         this.setupEventListeners();
     }
 
@@ -502,21 +603,20 @@ export class Game {
             startPos.x + offsetX,
             startPos.y + offsetY,
             this.player.aimAngle,
-            "1",
+            this.player.id || "undefined",
             this.gameContainer,
             this.world
         );
 
         this.bullets.push(bullet);
 
-        // socket.emit('player_shoot', {
-        //     x: handPos.x,
-        //     y: handPos.y,
-        //     targetX: targetX,
-        //     targetY: targetY,
-        //     playerId: this.player.id
-        // });
-
+        this.room!.send("shoot", { 
+            playerId: this.player.id, 
+            angle: this.player.aimAngle,
+            x: startPos.x + offsetX, 
+            y: startPos.y + offsetY,
+        });
+        
         const shootSoundInstance = new Audio(this.shootSound.src);
         shootSoundInstance.volume = this.shootSound.volume;
         shootSoundInstance.play();
@@ -543,13 +643,13 @@ export class Game {
                 );
 
                 this.bullets.push(bullet);
-                // socket.emit('player_shoot', {
-                //     x: handPos.x,
-                //     y: handPos.y,
-                //     targetX: targetX,
-                //     targetY: targetY,
-                //     playerId: this.player.id
-                // });
+
+                this.room!.send("shoot", { 
+                    playerId: this.player.id, 
+                    angle: this.player.aimAngle,
+                    x: startPos.x + offsetX, 
+                    y: startPos.y + offsetY,
+                });
 
                 const shootSoundInstance = new Audio(this.shootSound.src);
                 shootSoundInstance.volume = this.shootSound.volume;
@@ -636,7 +736,7 @@ export class Game {
                     center.x,
                     center.y,   
                     [matterPoints],
-                    { isStatic: true, label: 'wall' },
+                    { isStatic: true, label: 'wall' }
                 );
                 Matter.Composite.add(this.world, mapElementBody);
                 
