@@ -25,6 +25,7 @@
     "vite": "^7.0.6"
   },
   "dependencies": {
+    "@colyseus/monitor": "^0.16.7",
     "@colyseus/uwebsockets-transport": "^0.16.9",
     "@pixi/devtools": "^2.0.1",
     "colyseus": "^0.16.4",

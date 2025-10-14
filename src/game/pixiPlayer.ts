@@ -4,6 +4,17 @@ import { PixiArmatureDisplay, PixiFactory, Armature } from 'dragonbones-pixijs';
 import * as Matter from 'matter-js';
 
 type ArmatureDisplayType = PixiArmatureDisplay;
+type Point = {
+    x: number;
+    y: number;
+};
+type PositionSnapshot = {
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    timestamp: number;
+};
 
 export class Player {
     protected readonly _resources: string[] = [];
@@ -14,6 +25,7 @@ export class Player {
     id: string | undefined;
     x: number;
     y: number;
+    positionBuffer: PositionSnapshot[] = [];
     prevPlayerPosition!: { x: number, y: number, mouseX: number, mouseY: number, dx: number, dy: number };
     width: number;
     height: number;
@@ -24,6 +36,7 @@ export class Player {
     gravity: number;
     verticalSpeed: number;
     isAlive: boolean;
+    isMoving: boolean = false;
     handAngle: number;
     aimAngle: number;
     dx: number;
@@ -44,7 +57,6 @@ export class Player {
     psyhicsWorld: Matter.World;
 
     constructor(id: string | undefined, x: number, y: number, parentContainer: PIXI.Container, psyhicsWorld: Matter.World, gravity: boolean = true) {
-        // this.id = socket.id ?? "PlayerName";
         this.isAlive = true;
         this.id = id;
         this.width = 36;
@@ -85,6 +97,7 @@ export class Player {
                 mask: 0xFFFF ^ 0x0002 // koliduje ze wszystkimi oprócz graczy
             }
         });
+        
         Matter.Composite.add(psyhicsWorld, this.playerMatterBody);
 
         this.playerMatterBody.ignoreGravity = gravity;
@@ -176,7 +189,6 @@ export class Player {
 
         const aimAngle = Math.atan2(this.dy, this.dx);
         this.aimAngle = aimAngle; // nowa zmienna przechowująca kąt do strzału
-
         // ustawiamy flipX na podstawie kierunku myszy
         this._armatureDisplay.armature.flipX = this.dx < 0;
 

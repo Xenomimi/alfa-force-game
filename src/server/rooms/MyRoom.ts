@@ -18,10 +18,14 @@ export class MyRoom extends Room<MyRoomState> {
     private world: Matter.World;
     private playerBodies: Map<string, Matter.Body> = new Map();
     private bulletBodies: Map<string, Matter.Body> = new Map();
-    
+    private moveSpeed = 15;
+    private jumpVelocity = -20;
+    private enlapsedTime = 0;
+    private fixedTimeStep = 1000 / 60;
+
     constructor() {
         super();
-        this.patchRate = 7; // ok. upds 144 / s
+        this.patchRate = 16; // ok. upds 144 / s
         this.physicsEngine = Matter.Engine.create({gravity: { x: 0, y: 2.5 }});
         this.world = this.physicsEngine.world;
     }
@@ -29,8 +33,15 @@ export class MyRoom extends Room<MyRoomState> {
     // --- LOGIKA POKOJU ---
 
     onCreate(options: any) {
+
         this.initEngine();
-        this.setSimulationInterval((deltaTime) => this.updateEngine(deltaTime));
+        this.setSimulationInterval((deltaTime) => {
+            this.enlapsedTime += deltaTime;
+            while (this.enlapsedTime >= this.fixedTimeStep) {
+                this.enlapsedTime -= this.fixedTimeStep;
+                this.updateEngine(this.fixedTimeStep);
+            }
+        });
         this.createMap();
         this.state = new MyRoomState();
         this.addMessageHandlers();
@@ -62,13 +73,12 @@ export class MyRoom extends Room<MyRoomState> {
 
         const playerState = new Player();
         playerState.id = client.sessionId;
-        playerState.x = startX;
-        playerState.y = startY;
         this.state.playerEntities.set(client.sessionId, playerState);
     }
  
     onLeave(client: Client, options: any) {
         this.state.playerEntities.delete(client.sessionId);
+        this.playerBodies.delete(client.sessionId);
     }
 
     // --- LOGIKA GRY ---
@@ -113,15 +123,67 @@ export class MyRoom extends Room<MyRoomState> {
                     console.log("Hit player", a.id);
                     (b as any).bulletRef.hasCollided = true;
                 }
-                if(a.label === "player" && b.label === "player") {
-                    console.log("Player bump");
-                }
             }
         });
     }
 
+    
+
     updateEngine(deltaTime: number) {
+        for (const [sessionId, body] of this.playerBodies.entries()) {
+            const player = this.state.playerEntities.get(sessionId);
+            if (player) {
+                player.x = body.position.x;
+                player.y = body.position.y;
+
+                let velocity = { x: body.velocity.x, y: body.velocity.y };
+
+                if (player.input.left) {
+                    velocity.x = -this.moveSpeed;
+                } else if (player.input.right) {
+                    velocity.x = this.moveSpeed;
+                } else {
+                    velocity.x = 0;
+                }
+                // if (player.input.jump && body.velocity.y === 0) {
+                //     velocity.y = this.jumpVelocity;
+                // }
+
+                if (player.input.jump) {
+                    velocity.y = this.jumpVelocity;
+                }
+                Matter.Body.setVelocity(body, velocity);
+            }
+        }
         Matter.Engine.update(this.physicsEngine, deltaTime);
+    }
+
+    addMessageHandlers() {
+        this.onMessage("input", (client, data) => {
+            const player = this.state.playerEntities.get(client.sessionId);
+
+            if (player) {
+                player.input.left = data.left;
+                player.input.right = data.right;
+                player.input.jump = data.jump;
+                player.lastInputTick = data.tick;
+                player.dx = data.dx;
+                player.dy = data.dy;
+            }
+        });
+
+        // this.onMessage("shoot", (client, data: {angle: number}) => {
+        //     const player = this.state.playerEntities.get(client.sessionId);
+        //     if (player) {
+        //         const bulletId = nanoid();
+        //         const bulletState = new Bullet();
+        //         bulletState.id = bulletId;
+        //         bulletState.x = player.x;
+        //         bulletState.y = player.y;
+        //         bulletState.angle = data.angle;
+        //         this.state.bulletEntities.set(bulletId, bulletState);
+        //     }
+        // });
     }
 
     createMap() {
@@ -157,37 +219,6 @@ export class MyRoom extends Room<MyRoomState> {
                     { isStatic: true, label: 'wall' }
                 );
                 Matter.Composite.add(this.world, mapElementBody);
-            }
-        });
-    }
-
-    addMessageHandlers() {
-        this.onMessage("move", (client, message) => {
-            const player = this.state.playerEntities.get(client.sessionId);
-            if (player) {
-                player.x = message.x;
-                player.y = message.y;
-                player.dx = message.dx;
-                player.dy = message.dy;
-                // console.log(`Player ${player.id} moved to (${player.x}, ${player.y})`);
-            }
-        });
-
-        this.onMessage("shoot", (client, message) => {
-            const bullet = new Bullet();
-            bullet.id = nanoid();
-            bullet.playerId = client.sessionId;
-            bullet.aimAngle = message.angle;
-            bullet.x = message.x;
-            bullet.y = message.y;
-            this.state.bulletEntities.set(bullet.id, bullet);
-        });
-        this.onMessage("input", (client, data) => {
-            const player = this.state.playerEntities.get(client.sessionId);
-            if (player) {
-                player.input.left = data.left;
-                player.input.right = data.right;
-                player.input.jump = data.jump;
             }
         });
     }

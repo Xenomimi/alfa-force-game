@@ -3,14 +3,10 @@ import { initDevtools } from '@pixi/devtools';
 import { Viewport } from 'pixi-viewport';
 import * as Matter from 'matter-js';
 import { Room, getStateCallbacks } from 'colyseus.js';
-
 import { Player } from "./pixiPlayer";
 import { Bullet } from "./pixiBullet";
-
 import { CameraController } from "./CameraController";
 import mapData from "../assets/map_data.json";
-
-
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -41,12 +37,22 @@ export class Game {
     bullets!: Bullet[];
     room: Room<any> | null;
     roomCallBacks: any;
+    accumulator: number = 0;
+    fixedDelta: number = 1000 / 60; // 16.67ms
+    private lastPlayerPos: Point = { x: 800, y: 300 }
     private shootSound!: HTMLAudioElement;
     private boundHandleMouseDown: (event: MouseEvent) => void;
     private boundHandleMouseUp: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
+    private inputSequence: number = 0;
+    private pendingInputs: Array<{
+        tick: number;
+        input: {left: boolean, right: boolean, jump: boolean};
+    }> = [];
+    private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
+    private serverTick: number = 0;
 
     constructor(containerElement: HTMLDivElement, room: Room<any> | null) {
         this.boundHandleMouseDown = this.handleMouseDown.bind(this);
@@ -78,37 +84,111 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            // this.drawDebugBodies();
+            this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }
 
+    private addPlayer() {
+        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
+        const speedX = 15;
+        const jumpVelocity = -20;
+
+        const pixiDebugPoint = new PIXI.Graphics().circle(0, 0, 50).fill({color: 0xff0000 });
+        this.testContainer.addChild(pixiDebugPoint);
+
+        this.app.ticker.add(() => {
+            if (!this.player._armatureDisplay) return;
+            // 1. Input
+            const input = {
+                left: keysPressed['a'] || false,
+                right: keysPressed['d'] || false,
+                jump: keysPressed['w'] || false
+            };
+            // 2. Wyślij do serwera
+            this.inputSequence++;
+            this.room?.send("input", {
+                ...input,
+                tick: this.inputSequence,
+                dx: this.player.dx,
+                dy: this.player.dy
+            });
+
+            pixiDebugPoint.position.set(this.player.dx, this.player.dy);
+            // 3. Zapisz do bufora
+            this.pendingInputs.push({
+                tick: this.inputSequence,
+                input: {...input}
+            });
+            // Ogranicz rozmiar bufora
+            if (this.pendingInputs.length > 20) {
+                this.pendingInputs.shift();
+            }
+            // 4. Zastosuj input do fizyki (predykcja lokalna) – przenieś do fixed loopa, jeśli możesz
+            this.applyInput(
+                this.player.playerMatterBody,
+                input,
+                speedX,
+                jumpVelocity
+            );
+            // 5. Interpolacja wizualna PIXI -> MATTER  
+            const currentPos = this.player.playerMatterBody.position;
+            const alpha = Math.min(this.accumulator / this.fixedDelta, 1);
+            this.player.playerContainer.x = this.player.x = this.lastPlayerPos.x + (currentPos.x - this.lastPlayerPos.x) * alpha;
+            this.player.playerContainer.y = this.player.y = this.lastPlayerPos.y + (currentPos.y - this.lastPlayerPos.y) * alpha;
+
+            // 6. Animacje
+            const moving = input.left || input.right;
+            if (moving && this.player._armatureDisplay.animation.lastAnimationName !== "run") {
+                this.player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+            } else if (!moving && this.player._armatureDisplay.animation.lastAnimationName !== "idle") {
+                this.player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+            }
+            // 7. Kamera i reszta
+            this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
+            this.camera.setMouse(this.mouseX, this.mouseY);
+            this.camera.update(this.app.ticker.deltaMS / 1000);
+            this.updateBullets();
+        });
+    }
+
     private addRoomEventHandlers() {
         this.roomCallBacks(this.room!.state).playerEntities.onAdd((player: any, sessionId: string) => {
-            
+            const entity = new PIXI.Graphics().rect(0, 0, 36, 140).fill({color: 0x0000ff });
+            entity.pivot.set(18, 70);
+            this.testContainer.addChild(entity);
             console.log("Player added:", sessionId, this.room!.sessionId);
             if (sessionId === this.room!.sessionId) {
-                // this.roomCallBacks(player).onChange(() => {
+                this.roomCallBacks(player).onChange(() => {
+                    
+                    this.serverPosition = { x: player.x, y: player.y, dx: player.dx, dy: player.dy };
+                    this.serverTick = player.lastInputTick || 0;
 
-                // });
+                });
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
                 const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true);
                 otherPlayers[sessionId] = newPlayer;
-
+                
+                newPlayer.positionBuffer = [];
                 // Synchronizuj jego pozycję z serwera
                 this.roomCallBacks(player).onChange(() => {
                     const other = otherPlayers[sessionId];
                     if (other && other.playerMatterBody) {
                         // Aktualizuj pozycję ciała fizycznego Matter.js
-                        Matter.Body.setPosition(other.playerMatterBody, {
-                            x: player.x,
-                            y: player.y
-                        });
-
                         other.dx = player.dx;
                         other.dy = player.dy;
+                        other.isMoving = player.input.left || player.input.right;
+                        other.positionBuffer.push({
+                                                x: player.x,
+                                                y: player.y,
+                                                dx: player.dx || 0,
+                                                dy: player.dy || 0,
+                                                timestamp: Date.now()
+                                            });
+
+                        if (other.positionBuffer.length > 20) other.positionBuffer.shift();
                     }
                 });
                 console.log("Other player joined:", sessionId);
@@ -162,175 +242,121 @@ export class Game {
         });
     }
 
+    // private updateOtherPlayers() {
+    //     this.app.ticker.add(() => {
+    //         for (let id in otherPlayers) {
+    //             const player = otherPlayers[id];
+    //             if (player && player.playerMatterBody && player.playerContainer) {
+    //                 // Synchronizuj pozycję kontenera PIXI z ciałem Matter.js
+    //                 player.playerContainer.x = player.playerMatterBody.position.x;
+    //                 player.playerContainer.y = player.playerMatterBody.position.y;
+                    
+    //                 // Aktualizuj wewnętrzne właściwości gracza
+    //                 player.x = player.playerContainer.x;
+    //                 player.y = player.playerContainer.y;
+    //                 player.updateRemoteHandPositionAngle();
+
+    //                 // Jeśli gracz ma animację, możesz ją też zaktualizować
+    //                 if (player._armatureDisplay) {
+    //                     // Sprawdź czy gracz się porusza na podstawie prędkości
+    //                     const velocity = player.playerMatterBody.velocity;
+    //                     const isMoving = Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1;
+                        
+    //                     if (isMoving && player._armatureDisplay.animation.lastAnimationName !== "run") {
+    //                         player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+    //                     } else if (!isMoving && player._armatureDisplay.animation.lastAnimationName !== "idle") {
+    //                         player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     });
+    // }
+
     private updateOtherPlayers() {
+        const renderTime = Date.now() - 20; // 100ms opóźnienie dla płynności
+
         this.app.ticker.add(() => {
             for (let id in otherPlayers) {
                 const player = otherPlayers[id];
-                if (player && player.playerMatterBody && player.playerContainer) {
-                    // Synchronizuj pozycję kontenera PIXI z ciałem Matter.js
-                    player.playerContainer.x = player.playerMatterBody.position.x;
-                    player.playerContainer.y = player.playerMatterBody.position.y;
-                    
-                    // Aktualizuj wewnętrzne właściwości gracza
-                    player.x = player.playerContainer.x;
-                    player.y = player.playerContainer.y;
-                    player.updateRemoteHandPositionAngle();
+                if (!player || !player.positionBuffer) continue;
 
-                    // Jeśli gracz ma animację, możesz ją też zaktualizować
-                    if (player._armatureDisplay) {
-                        // Sprawdź czy gracz się porusza na podstawie prędkości
-                        const velocity = player.playerMatterBody.velocity;
-                        const isMoving = Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1;
-                        
-                        if (isMoving && player._armatureDisplay.animation.lastAnimationName !== "run") {
-                            player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
-                        } else if (!isMoving && player._armatureDisplay.animation.lastAnimationName !== "idle") {
-                            player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
-                        }
+                // Znajdź dwie pozycje do interpolacji
+                let pos0 = null;
+                let pos1 = null;
+
+                for (let i = 0; i < player.positionBuffer.length - 1; i++) {
+                    if (player.positionBuffer[i].timestamp <= renderTime &&
+                        player.positionBuffer[i + 1].timestamp >= renderTime) {
+                        pos0 = player.positionBuffer[i];
+                        pos1 = player.positionBuffer[i + 1];
+                        break;
                     }
                 }
+
+                if (pos0 && pos1) {
+                    // Interpolacja liniowa
+                    const total = pos1.timestamp - pos0.timestamp;
+                    const portion = (renderTime - pos0.timestamp) / total;
+
+                    const interpolatedX = pos0.x + (pos1.x - pos0.x) * portion;
+                    const interpolatedY = pos0.y + (pos1.y - pos0.y) * portion;
+
+                    Matter.Body.setPosition(player.playerMatterBody, {
+                        x: interpolatedX,
+                        y: interpolatedY
+                    });
+
+                } else if (player.positionBuffer.length > 0) {
+                    // Brak danych do interpolacji - użyj najnowszej pozycji
+                    const latest = player.positionBuffer[player.positionBuffer.length - 1];
+                    Matter.Body.setPosition(player.playerMatterBody, {
+                        x: latest.x,
+                        y: latest.y
+                    });
+                }
+
+                // Synchronizuj PIXI z Matter.js
+                player.playerContainer.x = player.x = player.playerMatterBody.position.x;
+                player.playerContainer.y = player.y = player.playerMatterBody.position.y;
+                player.updateRemoteHandPositionAngle();
+
+                // Animacje
+                if (!player._armatureDisplay || !player._armatureDisplay.animation) continue;
+                
+                if (player.isMoving && player._armatureDisplay.animation.lastAnimationName !== "run") {
+                    player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
+                } else if (!player.isMoving && player._armatureDisplay.animation.lastAnimationName !== "idle") {
+                    player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
+                }
             }
         });
     }
 
-    private addPlayer() {   
-        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
+   
 
-        const speedX = 15;
-        const jumpVelocity = -20;
-
-
-
-        // Aktualizacje gracza
-        this.app.ticker.add(() => {
-            if (!this.player._armatureDisplay) return;
-            let moving = false;
-            // Synchronizacja pozycji gracza, kontenera PIXI oraz ciała Matter.js
-            this.player.x = this.player.playerContainer.x = Math.round(this.player.playerMatterBody.position.x);
-            this.player.y = this.player.playerContainer.y = Math.round(this.player.playerMatterBody.position.y);
-            // playerBodyGraphics.x = this.playerBody.position.x;
-            // playerBodyGraphics.y = this.playerBody.position.y;
-            // playerBodyGraphics.rotation = this.playerBody.angle;
-
-            if (this.player.x !== this.player.prevPlayerPosition.x || 
-                this.player.y !== this.player.prevPlayerPosition.y ||
-                this.player.dx !== this.player.prevPlayerPosition.dx ||
-                this.player.dy !== this.player.prevPlayerPosition.dy) {
-                
-                this.room?.send("move", { x: this.player.x, y: this.player.y, dx: this.player.dx, dy: this.player.dy });
-
-                this.player.prevPlayerPosition.x = this.player.x;
-                this.player.prevPlayerPosition.y = this.player.y;
-                this.player.prevPlayerPosition.dx = this.player.dx;
-                this.player.prevPlayerPosition.dy = this.player.dy;
-            }
-
-            let velocity = { x: this.player.playerMatterBody.velocity.x, y: this.player.playerMatterBody.velocity.y };
-            if (keysPressed['a']) {
-                velocity.x = -speedX;
-                moving = true;
-            }
-                
-            if (keysPressed['d']) {
-                velocity.x = speedX;
-                moving = true;
-            }
-            if (keysPressed['w']) {
-                velocity.y = jumpVelocity;
-            }
-            
-            if (!moving) {
-                velocity.x *= 0.9;
-                if (this.player._armatureDisplay.animation.lastAnimationName !== "idle") {
-                    this.player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
-                }
-            } else {
-                if (this.player._armatureDisplay.animation.lastAnimationName !== "run") {
-                    this.player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
-                }
-            }
-
-            this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
-            this.camera.setMouse(this.mouseX, this.mouseY);
-            this.camera.update(this.app.ticker.deltaMS / 1000);
-            this.updateBullets();
-            Matter.Body.setVelocity(this.player.playerMatterBody, velocity);
-        });
+    // Funkcja pomocnicza do aplikowania inputu
+    private applyInput(
+        body: Matter.Body,
+        input: {left: boolean, right: boolean, jump: boolean},
+        speedX: number,
+        jumpVelocity: number
+    ) {
+        let velocity = { x: body.velocity.x, y: body.velocity.y };
+        if (input.left) {
+            velocity.x = -speedX;
+        } else if (input.right) {
+            velocity.x = speedX;
+        } else {
+            velocity.x = 0; // damping tylko bez ruchu
+        }
+        if (input.jump) {
+            velocity.y = jumpVelocity;
+        }
+        Matter.Body.setVelocity(body, velocity);
     }
 
-    // private addPlayer() {   
-    //     this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
 
-    //     const speedX = 15;
-    //     const jumpVelocity = -20;
-
-    //     // Obiekt trzymający poprzedni stan inputów, żeby wysyłać tylko zmiany
-    //     let prevInput = { left: false, right: false, jump: false };
-
-    //     this.app.ticker.add(() => {
-    //         if (!this.player._armatureDisplay) return;
-
-    //         // --- 1. Odczyt inputów ---
-    //         const input = {
-    //             left: keysPressed['a'] || false,
-    //             right: keysPressed['d'] || false,
-    //             jump: keysPressed['w'] || false
-    //         };
-
-    //         // --- 2. Wysyłanie inputów do serwera tylko jeśli się zmieniły ---
-    //         if (input.left !== prevInput.left || input.right !== prevInput.right || input.jump !== prevInput.jump) {
-    //             this.room?.send("input", input);
-    //             prevInput = { ...input };
-    //         }
-
-    //         // --- 3. Predykcja lokalna (client-side prediction) ---
-    //         let velocity = { x: this.player.playerMatterBody.velocity.x, y: this.player.playerMatterBody.velocity.y };
-
-    //         if (input.left) velocity.x = -speedX;
-    //         else if (input.right) velocity.x = speedX;
-    //         else velocity.x *= 0.9; // hamowanie jeśli brak ruchu
-
-    //         if (input.jump) velocity.y = jumpVelocity;
-
-    //         Matter.Body.setVelocity(this.player.playerMatterBody, velocity);
-
-    //         // --- 4. Interpolacja pozycji do stanu z serwera ---
-    //         const serverPlayer = this.room?.state.playerEntities.get(this.player.id);
-    //         if (serverPlayer) {
-    //             const diffX = serverPlayer.x - this.player.playerMatterBody.position.x;
-    //             const diffY = serverPlayer.y - this.player.playerMatterBody.position.y;
-
-    //             Matter.Body.setPosition(this.player.playerMatterBody, {
-    //                 x: this.player.playerMatterBody.position.x + diffX * 0.2, // interpolacja 20%
-    //                 y: this.player.playerMatterBody.position.y + diffY * 0.2
-    //             });
-    //         }
-
-    //         // --- 5. Aktualizacja Pixi ---
-    //         this.player.playerContainer.x = this.player.playerMatterBody.position.x;
-    //         this.player.playerContainer.y = this.player.playerMatterBody.position.y;
-
-    //         // Animacje
-    //         const moving = input.left || input.right;
-    //         if (moving) {
-    //             if (this.player._armatureDisplay.animation.lastAnimationName !== "run") {
-    //                 this.player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
-    //             }
-    //         } else {
-    //             if (this.player._armatureDisplay.animation.lastAnimationName !== "idle") {
-    //                 this.player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
-    //             }
-    //         }
-
-    //         // --- 6. Kamera i ręce ---
-    //         this.player.updateHandPosition(this.mouseX, this.mouseY, this.viewport);
-    //         this.camera.setMouse(this.mouseX, this.mouseY);
-    //         this.camera.update(this.app.ticker.deltaMS / 1000);
-
-    //         // --- 7. Predykcja pocisków ---
-    //         this.updateBullets(); 
-    //     });
-    // }
 
     private drawDebugBodies() {
         this.app.stage.sortableChildren = true;
@@ -425,18 +451,35 @@ export class Game {
             }
         };
 
-        this.engine = Matter.Engine.create({
-            gravity: { x: 0, y: 2.5 },
-            // positionIterations: 6,
-            // velocityIterations: 4,
-            // constraintIterations: 2
-        });
+        this.engine = Matter.Engine.create({gravity: { x: 0, y: 2.5 }});
 
         this.world = this.engine.world;
 
-        this.app.ticker.add(() => {
-            Matter.Engine.update(this.engine, this.app.ticker.deltaMS);
-        }, undefined, PIXI.UPDATE_PRIORITY.HIGH);
+        this.app.ticker.add((ticker) => {
+            this.accumulator += ticker.deltaMS;
+            while (this.accumulator >= this.fixedDelta) {
+                this.lastPlayerPos.x = this.player.playerMatterBody.position.x;
+                this.lastPlayerPos.y = this.player.playerMatterBody.position.y;
+                
+                if (this.pendingInputs.length) {
+                    this.pendingInputs.forEach(p => {
+                        this.applyInput(this.player.playerMatterBody, p.input, 15, -20);
+                    });
+                }
+
+                Matter.Engine.update(this.engine, this.fixedDelta);
+                this.pendingInputs = this.pendingInputs.filter(p => p.tick > this.serverTick);
+
+                if (this.serverPosition) {
+                    const localPos = this.player.playerMatterBody.position;
+                    const lerpFactor = 0.2;
+                    const newX = localPos.x + (this.serverPosition.x - localPos.x) * lerpFactor;
+                    const newY = localPos.y + (this.serverPosition.y - localPos.y) * lerpFactor;
+                    Matter.Body.setPosition(this.player.playerMatterBody, { x: newX, y: newY });
+                }
+                this.accumulator -= this.fixedDelta;
+            }
+        });
 
         // Zdarzenia kolizji
         Matter.Events.on(this.engine, "collisionStart", (event) => {
@@ -484,9 +527,9 @@ export class Game {
 
         // Dodanie sprite'ów do odpowiednich kontenerów
         this.backgroundContainer.addChild(this.backgroundSprite);
-        this.backgroundContainer.cacheAsTexture(true);
+        // this.backgroundContainer.cacheAsTexture(true);
         this.foregroundContainer.addChild(this.foregroundSprite);
-        this.foregroundContainer.cacheAsTexture(true);
+        // this.foregroundContainer.cacheAsTexture(true);
 
         // Kamera
         this.viewport = new Viewport({
@@ -596,8 +639,21 @@ export class Game {
         const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
 
         const offsetX = Math.cos(this.player.aimAngle) * offset;
-        const offsetY = Math.sin(this.player.aimAngle) * offset;
+        const offsetY = Math.sin(this.player.aimAngle) * offset;;
 
+        const collisions = Matter.Query.ray(this.world.bodies, startPos, {
+            x: startPos.x + offsetX,
+            y: startPos.y + offsetY
+        });
+
+        const filtered = collisions.filter(collision => 
+            collision.bodyA !== this.player.playerMatterBody && collision.bodyB !== this.player.playerMatterBody
+        );
+
+        if (filtered.length > 0) {
+            // Jeżeli jest kolizja, nie strzelaj
+            return;
+        }
 
         const bullet = new Bullet(
             startPos.x + offsetX,
@@ -610,12 +666,12 @@ export class Game {
 
         this.bullets.push(bullet);
 
-        this.room!.send("shoot", { 
-            playerId: this.player.id, 
-            angle: this.player.aimAngle,
-            x: startPos.x + offsetX, 
-            y: startPos.y + offsetY,
-        });
+        // this.room!.send("shoot", { 
+        //     playerId: this.player.id, 
+        //     angle: this.player.aimAngle,
+        //     x: startPos.x + offsetX, 
+        //     y: startPos.y + offsetY,
+        // });
         
         const shootSoundInstance = new Audio(this.shootSound.src);
         shootSoundInstance.volume = this.shootSound.volume;
@@ -632,6 +688,19 @@ export class Game {
                 const offsetX = Math.cos(this.player.aimAngle) * offset;
                 const offsetY = Math.sin(this.player.aimAngle) * offset;
 
+                const collisions = Matter.Query.ray(this.world.bodies, startPos, {
+                    x: startPos.x + offsetX,
+                    y: startPos.y + offsetY
+                });
+
+                const filtered = collisions.filter(collision => 
+                    collision.bodyA !== this.player.playerMatterBody && collision.bodyB !== this.player.playerMatterBody
+                );
+
+                if (filtered.length > 0) {
+                    // Jeżeli jest kolizja, nie strzelaj
+                    return;
+                }
 
                 const bullet = new Bullet(
                     startPos.x + offsetX,
@@ -644,12 +713,12 @@ export class Game {
 
                 this.bullets.push(bullet);
 
-                this.room!.send("shoot", { 
-                    playerId: this.player.id, 
-                    angle: this.player.aimAngle,
-                    x: startPos.x + offsetX, 
-                    y: startPos.y + offsetY,
-                });
+                // this.room!.send("shoot", { 
+                //     playerId: this.player.id, 
+                //     angle: this.player.aimAngle,
+                //     x: startPos.x + offsetX, 
+                //     y: startPos.y + offsetY,
+                // });
 
                 const shootSoundInstance = new Audio(this.shootSound.src);
                 shootSoundInstance.volume = this.shootSound.volume;

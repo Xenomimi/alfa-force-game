@@ -1,7 +1,9 @@
-import { Server, LobbyRoom, Client, Room } from "colyseus";
+import { Server, Client, Room } from "colyseus";
 import { uWebSocketsTransport } from "@colyseus/uwebsockets-transport";
+import { monitor } from "@colyseus/monitor";
 import { MyRoom } from "./rooms/MyRoom";
 import { CustomLobbyRoom } from "./rooms/CustomLobbyRoom";
+import express from "express";
 
 const port = Number(process.env.PORT) || 2567;
 
@@ -22,6 +24,21 @@ gameServer.define("player_room", MyRoom)
   .on("dispose", (room: Room) => console.log(`🏠 Player room disposed: \x1b[31m${room.roomId}\x1b[0m`))
   .enableRealtimeListing();
 
+// gameServer.simulateLatency(100);
+
+
 gameServer.listen(port).then(() => {
   console.log(`🚀 Colyseus listening on ws://localhost:${port}`);
+});
+
+
+// Monitor
+const monitorPort = 3000; // osobny port dla monitoringu
+const app = express();
+
+// Monitor na /colyseus
+app.use("/colyseus", monitor());
+
+app.listen(monitorPort, () => {
+  console.log(`📊 Colyseus Monitor running at http://localhost:${monitorPort}/colyseus`);
 });
