@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int             @id @default(autoincrement())
+  email       String          @unique
+  username    String          @unique
+  password    String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  profile     PlayerProfile?
+}
+
+model PlayerProfile {
+  id            Int            @id @default(autoincrement())
+  userId        Int            @unique
+  level         Int             @default(1)
+  experience    Int             @default(0)
+  coins         Int             @default(0)
+  cash          Int             @default(0)
+  lastLogin     DateTime?
+
+  stats         PlayerStats?
+  inventory     InventoryItem[]
+
+  user          User            @relation(fields: [userId], references: [id])
+}
+
+model PlayerStats {
+  id          Int      @id @default(autoincrement())
+  profileId   Int      @unique
+  strength    Int      @default(0)
+  agility     Int      @default(0)
+  endurance   Int      @default(0)
+  intelligence Int     @default(0)
+  luck        Int      @default(0)
+
+  profile     PlayerProfile @relation(fields: [profileId], references: [id])
+}
+
+model Weapon {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  priceCoins  Int      @default(100)
+  priceCash   Int      @default(0)
+  damage      Int
+  speed       Int
+  accuracy    Int
+
+  inventory   InventoryItem[]
+}
+
+model InventoryItem {
+  id          Int      @id @default(autoincrement())
+  profileId   Int
+  weaponId    Int
+  equipped    Boolean  @default(false)
+  acquiredAt  DateTime @default(now())
+
+  profile     PlayerProfile @relation(fields: [profileId], references: [id])
+  weapon      Weapon        @relation(fields: [weaponId], references: [id])
+}

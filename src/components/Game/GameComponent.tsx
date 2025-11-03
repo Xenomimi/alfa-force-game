@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import GameHUD from './Hud/GameHUD.tsx';
-import { Game } from '../game/pixiGame.ts';
+import GameHUD from '../Hud/GameHUD.tsx';
+import { Game } from '../../game/pixiGame.ts';
 import { Room } from 'colyseus.js';
 
 interface GameProps {

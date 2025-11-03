@@ -105,7 +105,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
       return () => {
         lobby.current?.removeAllListeners();
         lobby.current?.leave();
-        // lobby.current = null;
+        lobby.current = null;
       };
   }, []);
 

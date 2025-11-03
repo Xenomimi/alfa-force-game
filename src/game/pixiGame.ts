@@ -94,9 +94,6 @@ export class Game {
         const speedX = 15;
         const jumpVelocity = -20;
 
-        const pixiDebugPoint = new PIXI.Graphics().circle(0, 0, 50).fill({color: 0xff0000 });
-        this.testContainer.addChild(pixiDebugPoint);
-
         this.app.ticker.add(() => {
             if (!this.player._armatureDisplay) return;
             // 1. Input
@@ -113,8 +110,6 @@ export class Game {
                 dx: this.player.dx,
                 dy: this.player.dy
             });
-
-            pixiDebugPoint.position.set(this.player.dx, this.player.dy);
             // 3. Zapisz do bufora
             this.pendingInputs.push({
                 tick: this.inputSequence,
@@ -639,7 +634,7 @@ export class Game {
         const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
 
         const offsetX = Math.cos(this.player.aimAngle) * offset;
-        const offsetY = Math.sin(this.player.aimAngle) * offset;;
+        const offsetY = Math.sin(this.player.aimAngle) * offset;
 
         const collisions = Matter.Query.ray(this.world.bodies, startPos, {
             x: startPos.x + offsetX,
@@ -655,6 +650,8 @@ export class Game {
             return;
         }
 
+        console.log("Firing bullet from:", startPos.x + offsetX, startPos.y + offsetY);
+
         const bullet = new Bullet(
             startPos.x + offsetX,
             startPos.y + offsetY,
@@ -666,12 +663,11 @@ export class Game {
 
         this.bullets.push(bullet);
 
-        // this.room!.send("shoot", { 
-        //     playerId: this.player.id, 
-        //     angle: this.player.aimAngle,
-        //     x: startPos.x + offsetX, 
-        //     y: startPos.y + offsetY,
-        // });
+        this.room!.send("shoot", { 
+            angle: this.player.aimAngle,
+            x: startPos.x + offsetX, 
+            y: startPos.y + offsetY,
+        });
         
         const shootSoundInstance = new Audio(this.shootSound.src);
         shootSoundInstance.volume = this.shootSound.volume;
@@ -713,12 +709,11 @@ export class Game {
 
                 this.bullets.push(bullet);
 
-                // this.room!.send("shoot", { 
-                //     playerId: this.player.id, 
-                //     angle: this.player.aimAngle,
-                //     x: startPos.x + offsetX, 
-                //     y: startPos.y + offsetY,
-                // });
+                this.room!.send("shoot", { 
+                    angle: this.player.aimAngle,
+                    x: startPos.x + offsetX, 
+                    y: startPos.y + offsetY,
+                });
 
                 const shootSoundInstance = new Audio(this.shootSound.src);
                 shootSoundInstance.volume = this.shootSound.volume;

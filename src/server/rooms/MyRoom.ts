@@ -71,7 +71,7 @@ export class MyRoom extends Room<MyRoomState> {
         Matter.Composite.add(this.world, playerMatterBody);
         this.playerBodies.set(client.sessionId, playerMatterBody);
 
-        const playerState = new Player();
+        const playerState = new Player(100);
         playerState.id = client.sessionId;
         this.state.playerEntities.set(client.sessionId, playerState);
     }
@@ -161,7 +161,6 @@ export class MyRoom extends Room<MyRoomState> {
     addMessageHandlers() {
         this.onMessage("input", (client, data) => {
             const player = this.state.playerEntities.get(client.sessionId);
-
             if (player) {
                 player.input.left = data.left;
                 player.input.right = data.right;
@@ -172,18 +171,19 @@ export class MyRoom extends Room<MyRoomState> {
             }
         });
 
-        // this.onMessage("shoot", (client, data: {angle: number}) => {
-        //     const player = this.state.playerEntities.get(client.sessionId);
-        //     if (player) {
-        //         const bulletId = nanoid();
-        //         const bulletState = new Bullet();
-        //         bulletState.id = bulletId;
-        //         bulletState.x = player.x;
-        //         bulletState.y = player.y;
-        //         bulletState.angle = data.angle;
-        //         this.state.bulletEntities.set(bulletId, bulletState);
-        //     }
-        // });
+        this.onMessage("shoot", (client, data) => {
+            const player = this.state.playerEntities.get(client.sessionId);
+            if (player) {
+                const bulletId = nanoid();
+                const bulletState = new Bullet();
+                bulletState.id = bulletId;
+                bulletState.playerId = player.id;
+                bulletState.x = data.x;
+                bulletState.y = data.y;
+                bulletState.aimAngle = data.angle;
+                this.state.bulletEntities.set(bulletId, bulletState);
+            }
+        });
     }
 
     createMap() {

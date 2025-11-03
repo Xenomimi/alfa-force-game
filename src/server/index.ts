@@ -1,11 +1,28 @@
+import * as dotenv from 'dotenv';
 import { Server, Client, Room } from "colyseus";
 import { uWebSocketsTransport } from "@colyseus/uwebsockets-transport";
 import { monitor } from "@colyseus/monitor";
 import { MyRoom } from "./rooms/MyRoom";
 import { CustomLobbyRoom } from "./rooms/CustomLobbyRoom";
 import express from "express";
+import cors from "cors";
+import authRoutes from "./auth";
+import cookieParser from "cookie-parser";
 
-const port = Number(process.env.PORT) || 2567;
+dotenv.config();
+
+const gameServerPort = Number(process.env.GAME_SERVER_PORT);
+const apiPort = Number(process.env.API_PORT);
+const monitorPort = Number(process.env.MONITOR_PORT);
+
+const app = express();
+app.use(cookieParser());
+app.use(cors({
+  credentials: true,
+  origin: "http://localhost:5173",
+}));
+app.use(express.json());
+app.use("/auth", authRoutes);
 
 const gameServer = new Server({
   transport: new uWebSocketsTransport()
@@ -26,19 +43,18 @@ gameServer.define("player_room", MyRoom)
 
 // gameServer.simulateLatency(100);
 
-
-gameServer.listen(port).then(() => {
-  console.log(`🚀 Colyseus listening on ws://localhost:${port}`);
+// API Server
+app.listen(apiPort, () => {
+  console.log(`🌐 API server running at http://localhost:${apiPort}`);
 });
 
+// Game Server
+gameServer.listen(gameServerPort).then(() => {
+  console.log(`🚀 Colyseus listening on ws://localhost:${gameServerPort}`);
+});
 
 // Monitor
-const monitorPort = 3000; // osobny port dla monitoringu
-const app = express();
-
-// Monitor na /colyseus
 app.use("/colyseus", monitor());
-
 app.listen(monitorPort, () => {
   console.log(`📊 Colyseus Monitor running at http://localhost:${monitorPort}/colyseus`);
 });

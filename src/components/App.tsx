@@ -1,30 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import LoginRegisterScreen from './LoginRegisterScreen.tsx';
+import LoginRegisterScreen from './Login/LoginRegisterScreen.tsx';
 import LobbyScreen from './Lobby/LobbyScreen.tsx';
-import GameComponent from './GameComponent.tsx';
+import GameComponent from './Game/GameComponent.tsx';
 import '../styles/style.css';
 import { Client, Room } from 'colyseus.js';
 
 
 const App: React.FC = () => {
-    const [screen, setScreen] = useState<'login' | 'lobby' | 'game'>(() => {
-        const stored = localStorage.getItem('isLoggedIn');
-        return stored === 'true' ? 'lobby' : 'login';
-    });
-
+    const [screen, setScreen] = useState<'login' | 'lobby' | 'game' | 'loading'>('loading');
     const clientRef = useRef<Client>(null);
-
     const [isClientReady, setIsClientReady] = useState(false);
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
     const [gameRoom, setGameRoom] = useState<Room | null>(null);
 
     const handleLogin = async () => {
-        localStorage.setItem('isLoggedIn', 'true');
         setScreen('lobby');
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('isLoggedIn');
+    const handleLogout = async () => {
+        await fetch("http://localhost:4000/auth/logout", {
+            method: "POST",
+            credentials: "include"
+        });
         lobbyRoom?.leave();
         setLobbyRoom(null);
         setScreen('login');
@@ -32,9 +29,8 @@ const App: React.FC = () => {
 
     const handleGameExit = async () => {
         try {
-            console.log(gameRoom);
             if (gameRoom) {
-                gameRoom.leave();
+                await gameRoom.leave();
                 setGameRoom(null);
             }
             setScreen('lobby')
@@ -44,11 +40,40 @@ const App: React.FC = () => {
     }
 
     useEffect(() => {
-        if (screen === 'lobby' && !clientRef.current) {
-            clientRef.current = new Client("ws://localhost:2567");
-            setIsClientReady(true);
-        }
+        const checkAuth = async () => {
+            try {
+                const res = await fetch("http://localhost:4000/auth/me", {
+                    credentials: "include"
+                });
+                if (!res.ok) {
+                    // nie traktuj 401 jako "błąd" — to normalny przypadek
+                    if (res.status === 401) {
+                        setScreen("login");
+                        return;
+                    }
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                if (data.loggedIn) {
+                    setScreen("lobby");
+                } else {
+                    setScreen("login");
+                }
+            } catch (err) {
+                console.error("Błąd przy sprawdzaniu sesji:", err);
+                setScreen("login");
+            }
+        };
+
+        checkAuth();
     }, []);
+
+    useEffect(() => {
+    if (screen === 'lobby' && !clientRef.current) {
+        clientRef.current = new Client("ws://localhost:2567");
+        setIsClientReady(true);
+    }
+    }, [screen]);
 
 
     if (screen === 'login') {

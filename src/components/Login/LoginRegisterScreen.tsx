@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import '../styles/LoginRegisterScreen.css';
+import './css/LoginRegisterScreen.css';
 
 interface Props {
   onLogin: () => void;
 }
 
+const API_URL = "http://localhost:4000/auth";
+
 const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
-  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -24,16 +28,55 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isRegister) {
-      // Obsługa rejestracji
-      console.log('Rejestracja:', formData);
-    } else {
-      // Obsługa logowania
-      console.log('Logowanie:', formData);
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (isRegister) {
+        if (formData.password !== formData.confirmPassword) {
+          setError("Hasła nie są takie same!");
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(`${API_URL}/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            username: formData.nickname,
+            password: formData.password,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Nie udało się utworzyć konta");
+
+        alert("Konto utworzone! Możesz się zalogować.");
+        setIsRegister(false);
+      } else {
+        const res = await fetch(`${API_URL}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Błąd logowania");
+
+        onLogin(); // przejście do lobby
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    onLogin(); // Przejście do ekranu lobby po zalogowaniu/rejestracji
   };
 
   return (
@@ -43,6 +86,8 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
           <img src="/logo.png" alt="Logo" className="logo" />
           <p>2D Shooter</p>
         </div>
+
+        {error && <p className="error-message">{error}</p>}
 
         {isRegister && (
           <input
@@ -61,7 +106,7 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
           placeholder="Wprowadź swój email"
           value={formData.email}
           onChange={handleChange}
-          // required
+          required
         />
 
         <input
@@ -70,7 +115,7 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
           placeholder="Wprowadź hasło"
           value={formData.password}
           onChange={handleChange}
-          // required
+          required
         />
 
         {isRegister && (
@@ -95,32 +140,31 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
               />
               Zapamiętaj mnie
             </label>
-            <a href="#">Zapomniałem hasła</a>
           </div>
         )}
 
-        <button type="submit" className={isRegister ? 'register-btn' : 'login-btn'}>
-          {isRegister ? 'ZAREJESTRUJ SIĘ' : 'ZALOGUJ SIĘ'}
+        <button
+          type="submit"
+          className={isRegister ? 'register-btn' : 'login-btn'}
+          disabled={loading}
+        >
+          {loading
+            ? "Czekaj..."
+            : isRegister
+              ? 'ZAREJESTRUJ SIĘ'
+              : 'ZALOGUJ SIĘ'}
         </button>
 
-        <button type="button" className="toggle-btn" onClick={() => setIsRegister(!isRegister)}>
+        <button
+          type="button"
+          className="toggle-btn"
+          onClick={() => setIsRegister(!isRegister)}
+        >
           {isRegister ? '← WRÓĆ DO LOGOWANIA' : 'ZAREJESTRUJ SIĘ'}
         </button>
-
-        <div className="separator"><span>lub</span></div>
-
-        <div className="social-buttons">
-          <button className="google-btn">Google</button>
-          <button className="steam-btn">Steam</button>
-        </div>
-
-        <p className="contact-info">
-          Nie masz konta? <a href="#">Skontaktuj się z administratorem</a>
-        </p>
       </form>
     </div>
   );
-  
 };
 
 export default LoginRegisterScreen;
