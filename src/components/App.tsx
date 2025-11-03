@@ -5,6 +5,23 @@ import GameComponent from './Game/GameComponent.tsx';
 import '../styles/style.css';
 import { Client, Room } from 'colyseus.js';
 
+export interface UserProfile {
+  level: number;
+  experience: number;
+  coins: number;
+  cash: number;
+}
+
+export interface User {
+  id: number;
+  username: string;
+  profile: UserProfile;
+}
+
+export interface UserData {
+  loggedIn: boolean;
+  user: User;
+}
 
 const App: React.FC = () => {
     const [screen, setScreen] = useState<'login' | 'lobby' | 'game' | 'loading'>('loading');
@@ -12,6 +29,7 @@ const App: React.FC = () => {
     const [isClientReady, setIsClientReady] = useState(false);
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
     const [gameRoom, setGameRoom] = useState<Room | null>(null);
+    const [userData, setUserData] = useState<UserData | null>(null);
 
     const handleLogin = async () => {
         setScreen('lobby');
@@ -54,6 +72,7 @@ const App: React.FC = () => {
                     throw new Error(`HTTP ${res.status}`);
                 }
                 const data = await res.json();
+                setUserData(data);
                 if (data.loggedIn) {
                     setScreen("lobby");
                 } else {
@@ -91,6 +110,7 @@ const App: React.FC = () => {
 
         return (
             <LobbyScreen
+            userData={userData}
             client={clientRef.current}
             onStartGame={(room: Room) => {
                 setGameRoom(room); // zapisz pokój

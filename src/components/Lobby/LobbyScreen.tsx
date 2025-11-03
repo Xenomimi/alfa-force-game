@@ -11,16 +11,18 @@ import ShopScreen from '../Shop/ShopScreen';
 import LeadersScreen from '../Ranking/LeadersScreen';
 import Settings from '../Settings/Settings';
 import { Client, Room, RoomAvailable } from 'colyseus.js';
+import { UserData } from '../App';
 
 export type Section = 'rozgrywki' | 'profil' | 'sklep' | 'liderzy' | 'ustawienia';
 
 interface LobbyScreenProps {
+  userData: UserData | null;
   client: Client | null;
   onStartGame: (room: Room) => void;
   onLogout: () => void;
 }
 
-const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout }) => {
+const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame, onLogout }) => {
   const [activeSection, setActiveSection] = useState('rozgrywki');
   const [rooms, setRooms] = useState<any[]>([]);
   const [connStatus, setConnStatus] = useState('Brak połączenia');
@@ -111,7 +113,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ client, onStartGame, onLogout
 
   return (
     <div className="lobby-container">
-      <LobbyHeader onLogout={onLogout}/>
+      <LobbyHeader userData={userData} onLogout={onLogout}/>
       <LobbyNav active={activeSection} onNavigate={handleNavigate} />
 
       {activeSection === 'profil' ? (
