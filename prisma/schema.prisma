@@ -47,14 +47,18 @@ model PlayerStats {
 }
 
 model Weapon {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  priceCoins  Int      @default(100)
-  priceCash   Int      @default(0)
-  damage      Int
-  speed       Int
-  accuracy    Int
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  priceCoins   Int      @default(100)
+  priceCash    Int      @default(0)
+  category     String
+  min_damage   Int
+  max_damage   Int
+  amunition    Int
+  reloadTime   Float
+  fireInterval Float
+  accuracy     Int
 
   inventory   InventoryItem[]
 }

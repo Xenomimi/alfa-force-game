@@ -1,14 +1,14 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "../generated/prisma";
-
+import { prisma } from "../index";
+import * as dotenv from 'dotenv';
 const router = express.Router();
-export const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET!
+dotenv.config()
 
-// 🧩 Rejestracja
+const JWT_SECRET = process.env.JWT_SECRET!;
+
 router.post("/register", async (req, res) => {
   const { email, username, password } = req.body;
 
@@ -67,7 +67,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// 🔑 Logowanie
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Brakuje danych" });
@@ -94,7 +93,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Wylogowanie
 router.post("/logout", (req, res) => {
   res.clearCookie('token');
   return res.json({ success: true });
@@ -118,5 +116,7 @@ router.get("/me", async (req, res) => {
     res.status(401).json({ loggedIn: false });
   }
 });
+
+
 
 export default router;

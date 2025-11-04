@@ -1,25 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  PackageCheck, Swords, Gem, Boxes,
+  PackageCheck, Swords, Gem,
   Coins, DollarSign
 } from 'lucide-react';
-import '../Shop/css/ShopScreen.css'; // stylizacja komponentu
-import '../Profile/css/PlayerProfile.css'; // wspólne style
+import '../Shop/css/ShopScreen.css';
+import '../Profile/css/PlayerProfile.css';
 
-/* ------------------------------------------------------------------ */
-/*  typy                                                               */
-/* ------------------------------------------------------------------ */
 type Tab = 'bronie' | 'artefakty';
+type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
+type ArtifactStats = { hp: number; armor: number; cooldown:number };
 
-type WeaponStats   = { min:number; max:number; ammo:number; reload:number; fireInt:number };
-type ArtifactStats = { hp:number; armor:number; cooldown:number };
-
-interface Item<T = unknown>{
-  id:number;
-  name:string;
-  stats:T;
-  price:number;
-  cat:string;
+interface Item<T = WeaponStats | ArtifactStats> {
+  id: number;
+  name: string;
+  description?: string;
+  stats: T;
+  priceCoins: number;
+  priceCash: number;
+  category: string;
 }
 
 const CATEGORIES = [
@@ -30,47 +28,60 @@ const CATEGORIES = [
 ];
 
 
-const ShopScreen:React.FC = () => {
+const ShopScreen: React.FC = () => {
   const [tab,setTab] = useState<Tab>('bronie');
   const [category,setCategory] = useState('smg');
-  const weapons:Item<WeaponStats>[] = Array.from({length:22}).map((_,i)=>({
-    id:i,
-    name:`Pistolet #${i+1}`,
-    cat: CATEGORIES[i% CATEGORIES.length].key,
-    stats:{ min:20+i*2, max:40+i*2, ammo:15+i,
-            reload:+(0.4+i*0.05).toFixed(1),
-            fireInt:+(0.18+i*0.01).toFixed(2) },
-    price:300+i*60
-  }));
+  const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
+  const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
 
-  const artifacts:Item<ArtifactStats>[] = Array.from({length:8}).map((_,i)=>({
-    id:i,
-    name:`Artefakt #${i+1}`,
-    cat:'artefakt',
-    stats:{ hp:50+i*10, armor:5+i*2, cooldown:+(3-i*0.1).toFixed(1)},
-    price:650+i*120
-  }));
+  useEffect(() => {
+    const populateShop = async () => {
+        try {
+            const res = await fetch("http://localhost:4000/shop/weapons", {
+                credentials: "include"
+            });
+            if (!res.ok) {
+                // nie traktuj 401 jako "błąd" — to normalny przypadek
+                if (res.status === 401) {
+                    return;
+                }
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            setWeapons(data);
+        } catch (err) {
+            console.error("Błąd przy sprawdzaniu sesji:", err);
+        }
+    };
 
-  const list = tab==='bronie' ? weapons : artifacts;
+    populateShop();
+  }, []);
+  
 
-  const filtered = useMemo(()=>(
-    tab==='bronie'
-      ? list.filter(it=>it.cat===category)
+
+  const list = tab === 'bronie' ? weapons : artifacts;
+
+  const filtered = useMemo(() => (
+    tab === 'bronie'
+      ? list.filter(it => it.category === category)
       : list
-  ),[list,tab,category]);
+  ), [list, tab, category]);
 
-  const renderStats = (it:Item) =>{
-    if(tab==='bronie'){
-      const s=it.stats as WeaponStats;
+
+  const renderStats = (it: Item) => {
+    if(tab === 'bronie') {
+      const s = it.stats as WeaponStats;
       return (
         <>
-          <span>Min DMG:</span><span>{s.min}</span>
-          <span>Max DMG:</span><span>{s.max}</span>
-          <span>Amunicja:</span><span>{s.ammo}</span>
-          <span>Przeład.:</span><span>{s.reload}s</span>
-          <span>Interw.:</span><span>{s.fireInt}s</span>
+          <span>Min DMG:</span><span>{s.min_damage}</span>
+          <span>Max DMG:</span><span>{s.max_damage}</span>
+          <span>Amunicja:</span><span>{s.amunition}</span>
+          <span>Przeładowanie:</span><span>{s.reloadTime}s</span>
+          <span>Interwał:</span><span>{s.fireInterval}s</span>
+          <span>Celność:</span><span>{s.accuracy}s</span>
         </>
-      );}
+      );
+    }
     const s=it.stats as ArtifactStats;
     return (
       <>
@@ -84,12 +95,10 @@ const ShopScreen:React.FC = () => {
   return(
     <div className="profile-root">     
       <aside className="profile-left">
-
         <section className="card shop-cat-card">
           <h4>Kategorie</h4>
-
           <ul className="cat-list">
-            {CATEGORIES.map(cat=>(
+            {CATEGORIES.map(cat => (
               <li key={cat.key}>
                 <button
                   className={cat.key===category?'cat-btn active':'cat-btn'}
@@ -102,7 +111,6 @@ const ShopScreen:React.FC = () => {
             ))}
           </ul>
         </section>
-
       </aside>
       <section className="profile-right card">
         <div className="tabs">
@@ -117,8 +125,8 @@ const ShopScreen:React.FC = () => {
           ><Gem size={14}/> Artefakty</button>
         </div>
         <div className="item-list">
-          {filtered.map(it=>(
-            <div key={it.id} className="item-card">
+          {filtered.map(it => (
+            <div key={ it.id } className="item-card">
               <div className="item-thumb">
                 <img src="https://dummyimage.com/600x400/000/fff"/>
               </div>
@@ -130,8 +138,8 @@ const ShopScreen:React.FC = () => {
               <div className="item-price">
                 <span className="price-label">Cena</span>
                 <div className="price-value">
-                  <Coins size={14} color="#f79824" /> {it.price}
-                  <DollarSign size={14} color="#39FF14"/> {it.price}
+                  <Coins size={14} color="#f79824" /> {it.priceCoins}
+                  <DollarSign size={14} color="#39FF14"/> {it.priceCash}
                 </div>
                 <button className="buy-btn">
                   <PackageCheck size={14}/> Kup

@@ -216,27 +216,39 @@
 }
 
 .price-value {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
     font-size: 18px;
     font-weight: 600;
-    align-items: center;
-    gap: 4px;
     color: var(--text-primary);
     margin-bottom: 4px;
 }
-.price-label{
-  display:block;
-  font-size:11px;
-  color:var(--accent-orange);
-  margin-bottom:4px;
+.price-label {
+  display: block;
+  font-size: 20px;
+  color: var(--accent-orange);
+  margin-bottom: 4px;
 }
 
 .stats-grid {
-    display:grid;
-    grid-template-columns:repeat(4, 1fr);
-    padding:  0 15px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0 15px;
     gap: 5px;
     width: 100%;
 }
+
+.stats-grid > span:nth-child(odd) {
+    text-align: end;
+}
+
+.stats-grid > span:nth-child(even) {
+    text-align: center;
+}
+
 /* Kup */
 .sell-btn{
   background:var(--accent-red);

@@ -1,4 +1,3 @@
-import * as dotenv from 'dotenv';
 import { Server, Client, Room } from "colyseus";
 import { uWebSocketsTransport } from "@colyseus/uwebsockets-transport";
 import { monitor } from "@colyseus/monitor";
@@ -6,14 +5,19 @@ import { MyRoom } from "./rooms/MyRoom";
 import { CustomLobbyRoom } from "./rooms/CustomLobbyRoom";
 import express from "express";
 import cors from "cors";
-import authRoutes from "./auth";
+import authRoutes from "./routers/auth";
+import shopRoutes from "./routers/shop";
 import cookieParser from "cookie-parser";
+import { PrismaClient } from "../generated/prisma";
+import * as dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config()
 
 const gameServerPort = Number(process.env.GAME_SERVER_PORT);
 const apiPort = Number(process.env.API_PORT);
 const monitorPort = Number(process.env.MONITOR_PORT);
+
+export const prisma = new PrismaClient();
 
 const app = express();
 app.use(cookieParser());
@@ -23,6 +27,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use("/auth", authRoutes);
+app.use("/shop", shopRoutes);
 
 const gameServer = new Server({
   transport: new uWebSocketsTransport()

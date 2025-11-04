@@ -12,9 +12,6 @@ interface LobbyHeaderProps {
 }
 
 const LobbyHeader: React.FC<LobbyHeaderProps> = ({ userData, onLogout }) => {
-  
-  console.log("LobbyHeader - userData:", userData);
-
   if (!userData) {
     return <div className="loading-header">Ładowanie...</div>;
   }
