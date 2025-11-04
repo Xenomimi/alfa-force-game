@@ -122,7 +122,7 @@ const App: React.FC = () => {
     }
 
     if (screen === 'game') { 
-        return <GameComponent gameRoom={gameRoom} handleExit={handleGameExit}/>; 
+        return <GameComponent userData={userData} gameRoom={gameRoom} handleExit={handleGameExit}/>; 
     }
 };
 

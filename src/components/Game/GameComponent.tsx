@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import GameHUD from '../Hud/GameHUD.tsx';
 import { Game } from '../../game/pixiGame.ts';
 import { Room } from 'colyseus.js';
+import { UserData } from '../App';
 
 interface GameProps {
+    userData: UserData | null;
     gameRoom: Room | null;
     handleExit: () => void;
 }
 
-const GameComponent: React.FC<GameProps> = ({ gameRoom, handleExit }) => { 
+const GameComponent: React.FC<GameProps> = ({userData, gameRoom, handleExit }) => { 
     const gameInstanceRef = useRef<Game | null>(null);
     const pixiContainerRef = useRef<HTMLDivElement>(null);
     
@@ -63,7 +65,7 @@ const GameComponent: React.FC<GameProps> = ({ gameRoom, handleExit }) => {
     return (    
         <div className="game-wrapper">
             <div id="pixiContainer" ref={pixiContainerRef}>
-                <GameHUD onGameExit={handleGameExit} />
+                <GameHUD userData={userData} onGameExit={handleGameExit} />
             </div>
         </div>
     ) 

@@ -18,7 +18,7 @@ type WeaponStats = {
 type ArtifactStats = {
   hp: number;
   armor: number;
-  cooldown: number; // s
+  cooldown: number;
 };
 
 interface Item<T = unknown>{

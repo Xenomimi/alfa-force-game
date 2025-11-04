@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './css/GameHUD.css';
 import LobbyHeader from '../Lobby/LobbyHeader';
+import { UserData } from '../App';
 
 /* Dummy-dane – w prawdziwej grze leci to z WebSocketa lub kontekstu gry */
 const mockScoreboard = [
@@ -11,11 +12,12 @@ const mockScoreboard = [
   { id: 5, name: 'EnemyFive',  kills:  3, deaths:12,  ping:120 },
 ];
 
-interface GameHUDProps { 
+interface GameHUDProps {
+  userData: UserData | null; 
   onGameExit: () => void 
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ onGameExit }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit }) => {
   const [showScore, setShowScore] = useState(false);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ onGameExit }) => {
   return (
     <div className="game-hud-container">
       {/* górny pasek */}
-      <LobbyHeader onLogout={onGameExit} />
+      <LobbyHeader userData={userData} onLogout={onGameExit} />
 
       {/* ►► SCOREBOARD ◄◄ */}
       {showScore && (
