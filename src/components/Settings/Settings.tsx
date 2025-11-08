@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import './css/Settings.css';
 import { Save, RotateCw } from 'lucide-react';
+import { UserData } from '../App.tsx';
 
-const Settings: React.FC = () => {
+interface SettingsProps {
+  userData: UserData | null;
+}
+
+const Settings: React.FC<SettingsProps> = ({ userData }) => {
   /* ↓ tylko podglądowe stany – prawdziwą logikę podłączysz później */
   const [nick,        setNick]        = useState('NazwaGracza');
   const [email,       setEmail]       = useState('user@mail.com');

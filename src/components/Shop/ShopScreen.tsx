@@ -57,8 +57,6 @@ const ShopScreen: React.FC = () => {
     populateShop();
   }, []);
   
-
-
   const list = tab === 'bronie' ? weapons : artifacts;
 
   const filtered = useMemo(() => (

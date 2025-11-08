@@ -2,6 +2,7 @@
 import React from 'react';
 import './css/LeadersScreen.css';
 import { Crown } from 'lucide-react';
+import { UserData } from '../App.tsx';
 
 interface Player {
   id: number;
@@ -30,7 +31,11 @@ const players: Player[] = [
     { id: 7, name: 'SharpShooter', avatar: `https://placehold.co/80x80/2C2F33/FFFFFF/png?text=${getInitials('SharpShooter')}`, points: 3456, reward: '+1000'  },
   ];
 
-const LeadersScreen: React.FC = () => {
+interface LeadersScreenProps {
+  userData: UserData | null;
+}
+
+const LeadersScreen: React.FC<LeadersScreenProps> = ({ userData }) => {
   const podium = players.slice(0, 3);
   
   // Załóżmy, że ID zalogowanego gracza to 4, aby zademonstrować podświetlenie

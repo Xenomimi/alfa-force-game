@@ -1,78 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Save,
   Shield, PackageCheck, Swords, Gem, Coins, DollarSign
 } from 'lucide-react';
 import './css/PlayerProfile.css';
+import { UserData } from '../App.tsx';
 
 type Tab = 'bronie' | 'artefakty';
+type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
+type ArtifactStats = { hp: number; armor: number; cooldown:number };
 
-type WeaponStats = {
-  min: number;
-  max: number;
-  ammo: number;
-  reload: number;
-  fireInt: number;
-};
-
-type ArtifactStats = {
-  hp: number;
-  armor: number;
-  cooldown: number;
-};
-
-interface Item<T = unknown>{
-  id:   number;
+type Item<T = WeaponStats | ArtifactStats> = {
+  id: number;
   name: string;
+  description?: string;
   stats: T;
-  cena: number;
+  priceCoins: number;
+  priceCash: number;
+  category: string;
 }
 
-const PlayerProfile: React.FC = () => {
-  
+interface PlayerProfileProps {
+  userData: UserData | null;
+}
+
+const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
     const [tab, setTab] = useState<Tab>('bronie');
+    const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
+    const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
+    // const userStats: UserStats = {}; 
 
-    const weapons: Item<WeaponStats>[] = Array.from({length:22}).map((_,i)=>{
-        const dmgBase = 20+i*2;
-        return{
-        id:i,
-        name:`Pistolet #${i+1}`,
-        stats:{
-            min:dmgBase,
-            max:dmgBase+20,
-            ammo:15+i,
-            reload:+(0.4+i*0.05).toFixed(1),
-            fireInt:+(0.18+i*0.01).toFixed(2)
-        },
-        cena:300+i*60
-        };
-    });
+    useEffect(() => {
+      const populateUserWeapons = async () => {
+          try {
+              const res = await fetch("http://localhost:4000/shop/weapons", {
+                  credentials: "include"
+              });
+              if (!res.ok) {
+                  if (res.status === 401) {
+                      return;
+                  }
+                  throw new Error(`HTTP ${res.status}`);
+              }
+              const data = await res.json();
+              setWeapons(data);
+          } catch (err) {
+              console.error("Błąd przy sprawdzaniu sesji:", err);
+          }
+      };
 
-    const artifacts: Item<ArtifactStats>[] = Array.from({length:2}).map((_,i)=>({
-        id:i,
-        name:`Artefakt #${i+1}`,
-        stats:{
-        hp:50+i*10,
-        armor:5+i*2,
-        cooldown:+(3.0-i*0.2).toFixed(1)
-        },
-        cena:500+i*120
-    }));
+      populateUserWeapons();
+    }, []);
 
     const list = tab==='bronie' ? weapons : artifacts;
   
     const renderStats = (it:Item) =>{
         if(tab==='bronie'){
-        const st = it.stats as WeaponStats;
-        return(
-            <>
-            <span>Min DMG:</span><span>{st.min}</span>
-            <span>Max DMG:</span><span>{st.max}</span>
-            <span>Amunicja:</span><span>{st.ammo}</span>
-            <span>Przeład.:</span><span>{st.reload}s</span>
-            <span>Interw.:</span><span>{st.fireInt}s</span>
-            </>
-        );
+          const s = it.stats as WeaponStats;
+          return(
+              <>
+                <span>Min DMG:</span><span>{s.min_damage}</span>
+                <span>Max DMG:</span><span>{s.max_damage}</span>
+                <span>Amunicja:</span><span>{s.amunition}</span>
+                <span>Przeładowanie:</span><span>{s.reloadTime}s</span>
+                <span>Interwał:</span><span>{s.fireInterval}s</span>
+                <span>Celność:</span><span>{s.accuracy}s</span>
+              </>
+          );
         }
     const st = it.stats as ArtifactStats;
     return(
@@ -90,14 +84,20 @@ const PlayerProfile: React.FC = () => {
           <div className="avatar">
             <img src="https://dummyimage.com/100x100/000/fff" alt="Avatar gracza"/>
           </div>
-          <h3 className="player-name">Nazwa gracza</h3>
+          <h3 className="player-name">{userData?.user.username}</h3>
 
           <div className="stats-mini">
-            <div><span>Poziom</span><strong>24</strong></div>
-            <div><span>Osiągnięcia</span><strong>24</strong></div>
+            <div><span>Poziom</span><strong>{userData?.user.profile.level}</strong></div>
+            <div><span>Osiągnięcia</span><strong>{userData?.user.profile.experience}</strong></div>
           </div>
 
-          <div className="big-placeholder">Statystyki gracza</div>
+          <div className="big-placeholder">
+              <div className="item-stats">
+                {list.map(it => (
+                <div className="stats-grid">{renderStats(it)}</div>
+                ))}
+              </div>
+          </div>
         </section>
 
         <section className="card equip-card">
@@ -159,8 +159,8 @@ const PlayerProfile: React.FC = () => {
               <div className="item-price">
                 <span className="price-label">Wartość</span>
                 <div className="price-value">
-                  <Coins size={14} color="#f79824" /> {it.cena}
-                  <DollarSign size={14} color="#39FF14"/> {it.cena}
+                  <Coins size={14} color="#f79824" /> {it.priceCoins}
+                  <DollarSign size={14} color="#39FF14"/> {it.priceCash}
                 </div>
                 <button className="sell-btn">
                   <PackageCheck size={14} /> Sprzedaj
