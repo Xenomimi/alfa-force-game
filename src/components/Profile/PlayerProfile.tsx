@@ -8,7 +8,8 @@ import { UserData } from '../App.tsx';
 
 type Tab = 'bronie' | 'artefakty';
 type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
-type ArtifactStats = { hp: number; armor: number; cooldown:number };
+type ArtifactStats = { bonusType: string; bonusValue: number };
+type UserStats = { health: number; armor: number; strength: number; agility: number; intelligence: number; accuracy: number };
 
 type Item<T = WeaponStats | ArtifactStats> = {
   id: number;
@@ -25,55 +26,73 @@ interface PlayerProfileProps {
 }
 
 const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
-    const [tab, setTab] = useState<Tab>('bronie');
-    const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
-    const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
-    // const userStats: UserStats = {}; 
+  const [tab, setTab] = useState<Tab>('bronie');
+  const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
+  const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
+  const [userStats, setUserStats] = useState<UserStats>({ health: -1, armor: -1, strength: -1, agility: -1, intelligence: -1, accuracy: -1 });
+  // const userStats: UserStats = {}; 
 
-    useEffect(() => {
-      const populateUserWeapons = async () => {
-          try {
-              const res = await fetch("http://localhost:4000/shop/weapons", {
-                  credentials: "include"
-              });
-              if (!res.ok) {
-                  if (res.status === 401) {
-                      return;
-                  }
-                  throw new Error(`HTTP ${res.status}`);
-              }
-              const data = await res.json();
-              setWeapons(data);
-          } catch (err) {
-              console.error("Błąd przy sprawdzaniu sesji:", err);
-          }
-      };
+  useEffect(() => {
+    const populateData = async () => {
+        try {
+            const [weaponsRes, artifactsRes, statsRes] = await Promise.all([
+              fetch("http://localhost:4000/shop/weapons", { credentials: "include" }),
+              fetch("http://localhost:4000/shop/artifacts", { credentials: "include" }),
+              fetch("http://localhost:4000/user/playerstats", { credentials: "include" }),
+            ]);
+            if (!weaponsRes.ok || !artifactsRes.ok || !statsRes.ok) {
+              throw new Error("Błąd przy pobieraniu danych");
+            }
+            const [weaponsData, artifactsData, statsData] = await Promise.all([
+              weaponsRes.json(),
+              artifactsRes.json(),
+              statsRes.json(),
+            ]);
 
-      populateUserWeapons();
-    }, []);
-
-    const list = tab==='bronie' ? weapons : artifacts;
-  
-    const renderStats = (it:Item) =>{
-        if(tab==='bronie'){
-          const s = it.stats as WeaponStats;
-          return(
-              <>
-                <span>Min DMG:</span><span>{s.min_damage}</span>
-                <span>Max DMG:</span><span>{s.max_damage}</span>
-                <span>Amunicja:</span><span>{s.amunition}</span>
-                <span>Przeładowanie:</span><span>{s.reloadTime}s</span>
-                <span>Interwał:</span><span>{s.fireInterval}s</span>
-                <span>Celność:</span><span>{s.accuracy}s</span>
-              </>
-          );
+            setWeapons(weaponsData);
+            setArtifacts(artifactsData);
+            setUserStats(statsData);
+        } catch (err) {
+            console.error("Błąd przy pobieraniu danych w PlayerProfile", err);
         }
+    };
+
+    populateData();
+  }, []);
+
+    const renderPlayerStats = (it: UserStats) =>{
+      const s = it;
+      return(
+          <>
+            <span>Health:</span><span>{s.health}</span>
+            <span>Armor:</span><span>{s.armor}</span>
+            <span>Strength:</span><span>{s.strength}</span>
+            <span>Agility:</span><span>{s.agility}</span>
+            <span>Intelligence:</span><span>{s.intelligence}</span>
+            <span>Accuracy:</span><span>{s.accuracy}</span>
+          </>
+      );
+  };  
+
+  const list = tab==='bronie' ? weapons : artifacts;
+  const renderWeaponStats = (it:Item) =>{
+    if(tab==='bronie'){
+      const s = it.stats as WeaponStats;
+      return(
+          <>
+            <span>Min DMG:</span><span>{s.min_damage}</span>
+            <span>Max DMG:</span><span>{s.max_damage}</span>
+            <span>Amunicja:</span><span>{s.amunition}</span>
+            <span>Przeładowanie:</span><span>{s.reloadTime}s</span>
+            <span>Interwał:</span><span>{s.fireInterval}s</span>
+            <span>Celność:</span><span>{s.accuracy}s</span>
+          </>
+      );
+    }
     const st = it.stats as ArtifactStats;
     return(
       <>
-        <span>+HP:</span><span>{st.hp}</span>
-        <span>Pancerz:</span><span>{st.armor}</span>
-        <span>CD:</span><span>{st.cooldown}s</span>
+        <span>{it.name}:</span><span>{st.bonusValue}</span>
       </>
     );
   };  
@@ -93,9 +112,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
 
           <div className="big-placeholder">
               <div className="item-stats">
-                {list.map(it => (
-                <div className="stats-grid">{renderStats(it)}</div>
-                ))}
+                <div className="stats-grid">{renderPlayerStats(userStats)}</div>
               </div>
           </div>
         </section>
@@ -114,7 +131,12 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
                 ))}
 
                 {/* ★ podgląd postaci */}
-                <div className="character-preview">Postać z gry</div>
+                <div className="character-preview">
+                  <div id="preview-box">
+                      <img width={150} src="player.png" alt="Podgląd postaci"/>
+                  </div>
+                  
+                </div>
             </div>
             <div className="equip-controls">
                 <button className="icon-sq"><ChevronLeft size={16} /></button>
@@ -145,13 +167,13 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
             <div key={it.id} className="item-card">
               {/* miniatura */}
               <div className="item-thumb">
-                <img src="https://dummyimage.com/600x400/000/fff" alt="Zdjęcie"/>
+                <img src="1654.png" alt="Zdjęcie"/>
               </div>
 
               {/* ▶ STATYSTYKI */}
               <div className="item-stats">
                 <div className="stats-grid">
-                    {renderStats(it)}
+                    {renderWeaponStats(it)}
                 </div>
               </div>
 

@@ -7,7 +7,7 @@ const router = express.Router();
 
 dotenv.config()
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+export const JWT_SECRET = process.env.JWT_SECRET!;
 
 router.post("/register", async (req, res) => {
   const { email, username, password } = req.body;
@@ -34,11 +34,11 @@ router.post("/register", async (req, res) => {
                 coins: 1000,
                 stats: {
                   create: {
-                    strength: 0,
+                    health: 100,
+                    armor: 0,
                     agility: 0,
-                    endurance: 0,
                     intelligence: 0,
-                    luck: 0,
+                    accuracy: 0,
                   },
                 },
                 inventory: {
@@ -107,7 +107,7 @@ router.get("/me", async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      include: { profile: true },
+      include: { profile: true},
     });
 
     if (!user) return res.status(404).json({ loggedIn: false });

@@ -30,6 +30,7 @@ model PlayerProfile {
 
   stats         PlayerStats?
   inventory     InventoryItem[]
+  artifacts     PlayerArtifact[]
 
   user          User            @relation(fields: [userId], references: [id])
 }
@@ -37,11 +38,12 @@ model PlayerProfile {
 model PlayerStats {
   id          Int      @id @default(autoincrement())
   profileId   Int      @unique
+  health      Int      @default(100)
+  armor       Int      @default(0)
   strength    Int      @default(0)
   agility     Int      @default(0)
-  endurance   Int      @default(0)
   intelligence Int     @default(0)
-  luck        Int      @default(0)
+  accuracy    Int      @default(0)
 
   profile     PlayerProfile @relation(fields: [profileId], references: [id])
 }
@@ -72,4 +74,30 @@ model InventoryItem {
 
   profile     PlayerProfile @relation(fields: [profileId], references: [id])
   weapon      Weapon        @relation(fields: [weaponId], references: [id])
+}
+
+model Artifact {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  bonusType    String
+  bonusValue   Int       @default(0)
+  priceCoins   Int       @default(0)
+  priceCash    Int       @default(0)
+
+  players      PlayerArtifact[]
+}
+
+model PlayerArtifact {
+  id           Int      @id @default(autoincrement())
+  profileId    Int
+  artifactId   Int
+  slot         Int
+  equipped     Boolean  @default(false)
+  acquiredAt   DateTime @default(now())
+
+  profile      PlayerProfile @relation(fields: [profileId], references: [id])
+  artifact     Artifact      @relation(fields: [artifactId], references: [id])
+
+  @@unique([profileId, slot]) // jeden artefakt na slot
 }

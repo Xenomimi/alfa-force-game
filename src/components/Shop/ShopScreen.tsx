@@ -8,7 +8,7 @@ import '../Profile/css/PlayerProfile.css';
 
 type Tab = 'bronie' | 'artefakty';
 type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
-type ArtifactStats = { hp: number; armor: number; cooldown:number };
+type ArtifactStats = { bonusType: string; bonusValue: number };
 
 interface Item<T = WeaponStats | ArtifactStats> {
   id: number;
@@ -17,7 +17,7 @@ interface Item<T = WeaponStats | ArtifactStats> {
   stats: T;
   priceCoins: number;
   priceCash: number;
-  category: string;
+  category?: string;
 }
 
 const CATEGORIES = [
@@ -27,30 +27,33 @@ const CATEGORIES = [
   { key:'melee', label:'Broń biała',          icon:<Swords size={18}/> },
 ];
 
-
 const ShopScreen: React.FC = () => {
   const [tab,setTab] = useState<Tab>('bronie');
   const [category,setCategory] = useState('smg');
   const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
   const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
-
+ 
   useEffect(() => {
     const populateShop = async () => {
         try {
-            const res = await fetch("http://localhost:4000/shop/weapons", {
-                credentials: "include"
-            });
-            if (!res.ok) {
-                // nie traktuj 401 jako "błąd" — to normalny przypadek
-                if (res.status === 401) {
-                    return;
-                }
-                throw new Error(`HTTP ${res.status}`);
+            const [weaponsRes, artifactsRes] = await Promise.all([
+              fetch("http://localhost:4000/shop/weapons", { credentials: "include" }),
+              fetch("http://localhost:4000/shop/artifacts", { credentials: "include" })
+            ]);
+            if (!weaponsRes.ok || !artifactsRes.ok) {
+              throw new Error("Błąd przy pobieraniu danych");
             }
-            const data = await res.json();
-            setWeapons(data);
+            const [weaponsData, artifactsData] = await Promise.all([
+              weaponsRes.json(),
+              artifactsRes.json()
+            ]);
+
+            setWeapons(weaponsData);
+            setArtifacts(artifactsData);
+            console.log("Pobrane bronie:", weaponsData);
+            console.log("Pobrane artefakty:", artifactsData);
         } catch (err) {
-            console.error("Błąd przy sprawdzaniu sesji:", err);
+            console.error("Błąd przy pobieraniu danych w PlayerProfile", err);
         }
     };
 
@@ -60,9 +63,7 @@ const ShopScreen: React.FC = () => {
   const list = tab === 'bronie' ? weapons : artifacts;
 
   const filtered = useMemo(() => (
-    tab === 'bronie'
-      ? list.filter(it => it.category === category)
-      : list
+    tab === 'bronie' ? list.filter(it => it.category === category) : list
   ), [list, tab, category]);
 
 
@@ -80,12 +81,12 @@ const ShopScreen: React.FC = () => {
         </>
       );
     }
-    const s=it.stats as ArtifactStats;
+    const s = it.stats as ArtifactStats;
+    if (!s) return <span>Brak danych</span>;
+    
     return (
       <>
-        <span>HP +</span><span>{s.hp}</span>
-        <span>Pancerz +</span><span>{s.armor}</span>
-        <span>CD:</span><span>{s.cooldown}s</span>
+        <span>{it.name}</span><span>+{s.bonusValue}</span>
       </>
     );
   };

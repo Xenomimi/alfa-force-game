@@ -7,6 +7,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./routers/auth";
 import shopRoutes from "./routers/shop";
+import userRoutes from "./routers/user";
 import cookieParser from "cookie-parser";
 import { PrismaClient } from "../generated/prisma";
 import * as dotenv from 'dotenv';
@@ -28,6 +29,7 @@ app.use(cors({
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/shop", shopRoutes);
+app.use("/user", userRoutes);
 
 const gameServer = new Server({
   transport: new uWebSocketsTransport()
