@@ -70,7 +70,9 @@ const LoginRegisterScreen: React.FC<Props> = ({ onLogin }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Błąd logowania");
 
-        onLogin(); // przejście do lobby
+        if (data.success) {
+          onLogin();
+        }
       }
     } catch (err: any) {
       setError(err.message);

@@ -1,14 +1,20 @@
-import { Room, Client } from "@colyseus/core";
+import { Room, Client, AuthContext } from "@colyseus/core";
 import { nanoid } from "nanoid";
 import { Player } from "../schema/Player";
 import { Bullet } from "../schema/Bullet";
 import { MyRoomState } from "../schema/MyRoomState";
 import mapData from "../../assets/map_data.json";
 import Matter from 'matter-js';
+import { JWT } from "@colyseus/auth"
+import { JWT_SECRET } from "../routers/auth";
 
 type Point = {
     x: number;
     y: number;
+};
+
+type JwtPayload = {
+    userId: number;
 };
 
 export class MyRoom extends Room<MyRoomState> {
@@ -47,9 +53,32 @@ export class MyRoom extends Room<MyRoomState> {
         this.addMessageHandlers();
         console.log("🕹️  MyRoom created!", options);
     }
+    
+    static async onAuth(token: string, options: any, context: AuthContext): Promise<JwtPayload> {
+        console.log("🔐 Authenticating user with token:", token);
+        
+        if (!token) {
+            throw new Error("Missing authentication token");
+        }
+
+        try {
+            JWT.settings.secret = JWT_SECRET;
+            console.log("Using JWT secret:", JWT.settings.secret);
+            const userdata = await JWT.verify(token) as JwtPayload;
+            return userdata;
+
+        } catch (e: any) {
+            // Logujemy szczegółowy błąd po stronie serwera
+            console.error(`Authentication failed for token: ${token}`, e.message);
+            
+            // Rzucamy ogólny błąd, który zobaczy klient
+            throw new Error("Invalid or expired token");
+        }
+    }
  
     onJoin(client: Client, options: any) {
 
+        console.log(`Token userId: ${client.auth} joined the room!`);
         // Najpierw tworzymy ciało gracza w silniku fizyki
         const startX = 800;
         const startY = 300;

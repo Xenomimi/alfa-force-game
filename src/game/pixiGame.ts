@@ -237,37 +237,6 @@ export class Game {
         });
     }
 
-    // private updateOtherPlayers() {
-    //     this.app.ticker.add(() => {
-    //         for (let id in otherPlayers) {
-    //             const player = otherPlayers[id];
-    //             if (player && player.playerMatterBody && player.playerContainer) {
-    //                 // Synchronizuj pozycję kontenera PIXI z ciałem Matter.js
-    //                 player.playerContainer.x = player.playerMatterBody.position.x;
-    //                 player.playerContainer.y = player.playerMatterBody.position.y;
-                    
-    //                 // Aktualizuj wewnętrzne właściwości gracza
-    //                 player.x = player.playerContainer.x;
-    //                 player.y = player.playerContainer.y;
-    //                 player.updateRemoteHandPositionAngle();
-
-    //                 // Jeśli gracz ma animację, możesz ją też zaktualizować
-    //                 if (player._armatureDisplay) {
-    //                     // Sprawdź czy gracz się porusza na podstawie prędkości
-    //                     const velocity = player.playerMatterBody.velocity;
-    //                     const isMoving = Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1;
-                        
-    //                     if (isMoving && player._armatureDisplay.animation.lastAnimationName !== "run") {
-    //                         player._armatureDisplay.animation.fadeIn("run", -1, -1, 0)!.resetToPose = true;
-    //                     } else if (!isMoving && player._armatureDisplay.animation.lastAnimationName !== "idle") {
-    //                         player._armatureDisplay.animation.fadeIn("idle", -1, -1, 0)!.resetToPose = true;
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     });
-    // }
-
     private updateOtherPlayers() {
         const renderTime = Date.now() - 20; // 100ms opóźnienie dla płynności
 
@@ -328,8 +297,6 @@ export class Game {
         });
     }
 
-   
-
     // Funkcja pomocnicza do aplikowania inputu
     private applyInput(
         body: Matter.Body,
@@ -350,8 +317,6 @@ export class Game {
         }
         Matter.Body.setVelocity(body, velocity);
     }
-
-
 
     private drawDebugBodies() {
         this.app.stage.sortableChildren = true;

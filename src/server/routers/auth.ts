@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../index";
 import * as dotenv from 'dotenv';
+import { verifyToken } from "../middleware/verifyToken";
 const router = express.Router();
 
 dotenv.config()
@@ -99,19 +100,15 @@ router.post("/logout", (req, res) => {
 });
 
 // Sprawdzenie sesji
-router.get("/me", async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ loggedIn: false });
-
+router.get("/me", verifyToken, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { profile: true},
+      where: { id: (req as any).userId },
+      include: { profile: true },
     });
 
     if (!user) return res.status(404).json({ loggedIn: false });
-    res.json({ loggedIn: true, user });
+    res.json({ loggedIn: true, user, token: req.cookies.token });
   } catch {
     res.status(401).json({ loggedIn: false });
   }

@@ -2,6 +2,7 @@ import express from "express";
 import { prisma } from "../index";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "./auth";
+import { verifyToken } from "../middleware/verifyToken";
 
 const router = express.Router();
 
@@ -17,6 +18,20 @@ router.get("/playerstats", async (req, res) => {
     } catch (err) {
         console.error("Błąd przy pobieraniu broni:", err);
         res.status(500).json({ error: "Błąd serwera przy pobieraniu broni" });
+    }
+});
+
+router.get("/playerinfo", verifyToken, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ 
+            where: { id: (req as any).userId },
+            include: { profile: true },
+        });
+        if (!user) return res.status(404).json({ user: false });
+        res.json({ username: user.username, profile: user.profile });
+    } catch (err) {
+        console.error("Błąd przy pobieraniu informacji o użytkowniku:", err);
+        res.status(500).json({ error: "Błąd serwera przy pobieraniu informacji o użytkowniku" });
     }
 });
 

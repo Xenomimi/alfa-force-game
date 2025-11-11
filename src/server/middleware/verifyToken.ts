@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-
-const JWT_SECRET = process.env.JWT_SECRET!;
+import { JWT_SECRET } from "../routers/auth";
 
 export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies.token;

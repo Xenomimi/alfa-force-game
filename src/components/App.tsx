@@ -20,7 +20,8 @@ export interface User {
 
 export interface UserData {
   loggedIn: boolean;
-  user: User;
+  user: User | null;
+  token: string;
 }
 
 const App: React.FC = () => {
@@ -29,10 +30,21 @@ const App: React.FC = () => {
     const [isClientReady, setIsClientReady] = useState(false);
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
     const [gameRoom, setGameRoom] = useState<Room | null>(null);
-    const [userData, setUserData] = useState<UserData | null>(null);
+    const [userData, setUserData] = useState<UserData>({ loggedIn: false, user: null, token: '' });
 
     const handleLogin = async () => {
-        setScreen('lobby');
+        // sprawdź sesję po zalogowaniu
+        const res = await fetch("http://localhost:4000/auth/me", {
+            credentials: "include",
+        });
+        const data = await res.json();
+
+        if (data.loggedIn) {
+            setUserData(data);
+            setScreen("lobby");
+        } else {
+            setScreen("login");
+        }
     };
 
     const handleLogout = async () => {
@@ -61,18 +73,18 @@ const App: React.FC = () => {
         const checkAuth = async () => {
             try {
                 const res = await fetch("http://localhost:4000/auth/me", {
-                    credentials: "include"
+                    credentials: "include"     
                 });
                 if (!res.ok) {
                     // nie traktuj 401 jako "błąd" — to normalny przypadek
                     if (res.status === 401) {
                         setScreen("login");
-                        return;
                     }
                     throw new Error(`HTTP ${res.status}`);
                 }
                 const data = await res.json();
                 setUserData(data);
+                console.log("Dane użytkownika po ustawieniu stanu:", userData);
                 if (data.loggedIn) {
                     setScreen("lobby");
                 } else {
@@ -88,11 +100,12 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-    if (screen === 'lobby' && !clientRef.current) {
-        clientRef.current = new Client("ws://localhost:2567");
-        setIsClientReady(true);
-    }
-    }, [screen]);
+        if (screen === 'lobby' && userData.token && !clientRef.current) {
+            clientRef.current = new Client("ws://localhost:2567");
+            clientRef.current.auth.token = userData.token;
+            setIsClientReady(true);
+        }
+    }, [screen, userData.token]);
 
 
     if (screen === 'login') {
