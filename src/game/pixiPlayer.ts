@@ -30,7 +30,7 @@ export class Player {
     width: number;
     height: number;
     bottom: number;
-    // playerName: string;
+    playerName: string = "";
     shootingPointOffsetX: number = 60;
     speed: number;
     gravity: number;
@@ -334,7 +334,7 @@ export class Player {
         const nameY = this.bottom - this.height - 15;
 
         const text = new PIXI.Text({
-            text: this.id,
+            text: this.playerName,
             style: {
                 fontFamily: 'Arial',
                 fontSize: 20,

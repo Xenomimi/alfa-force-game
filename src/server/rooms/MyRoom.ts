@@ -7,6 +7,7 @@ import mapData from "../../assets/map_data.json";
 import Matter from 'matter-js';
 import { JWT } from "@colyseus/auth"
 import { JWT_SECRET } from "../routers/auth";
+import { prisma } from "../index";
 
 type Point = {
     x: number;
@@ -15,6 +16,41 @@ type Point = {
 
 type JwtPayload = {
     userId: number;
+};
+
+type UserInfo = {
+  id: number;
+  email: string;
+  username: string;
+  password: string;
+  createdAt: Date;
+  updatedAt: Date;
+  profile: {
+    id: number;
+    userId: number;
+    level: number;
+    experience: number;
+    coins: number;
+    cash: number;
+    lastLogin: Date | null;
+    stats: {
+      id: number;
+      profileId: number;
+      health: number;
+      armor: number;
+      strength: number;
+      agility: number;
+      intelligence: number;
+      accuracy: number;
+    } | null;
+    inventory: {
+      id: number;
+      profileId: number;
+      weaponId: number;
+      equipped: boolean;
+      acquiredAt: Date;
+    }[] | null;
+  } | null;
 };
 
 export class MyRoom extends Room<MyRoomState> {
@@ -54,7 +90,7 @@ export class MyRoom extends Room<MyRoomState> {
         console.log("🕹️  MyRoom created!", options);
     }
     
-    static async onAuth(token: string, options: any, context: AuthContext): Promise<JwtPayload> {
+    static async onAuth(token: string, options: any, context: AuthContext): Promise<UserInfo> {
         console.log("🔐 Authenticating user with token:", token);
         
         if (!token) {
@@ -65,7 +101,22 @@ export class MyRoom extends Room<MyRoomState> {
             JWT.settings.secret = JWT_SECRET;
             console.log("Using JWT secret:", JWT.settings.secret);
             const userdata = await JWT.verify(token) as JwtPayload;
-            return userdata;
+
+            // Tutaj po udanej weryfikacji możemy zwrócić dodatkowe dane użytkownika
+            // z bazy danych, jeśli to konieczne vvvv.
+            const userInfo = await prisma.user.findUniqueOrThrow({
+                where: { id: userdata.userId }, 
+                include: { 
+                    profile: { 
+                        include: {
+                            stats: true, 
+                            inventory: true 
+                        }
+                    } 
+                } 
+            });
+
+            return userInfo;
 
         } catch (e: any) {
             // Logujemy szczegółowy błąd po stronie serwera
@@ -76,9 +127,13 @@ export class MyRoom extends Room<MyRoomState> {
         }
     }
  
-    onJoin(client: Client, options: any) {
+    onJoin(client: Client, options: any, auth: UserInfo) {
 
-        console.log(`Token userId: ${client.auth} joined the room!`);
+        console.dir(auth, { depth: null });
+
+        if (!auth.profile || !auth.profile.stats) {
+            throw new Error("Brak profilu lub statystyk dla użytkownika");
+        }
         // Najpierw tworzymy ciało gracza w silniku fizyki
         const startX = 800;
         const startY = 300;
@@ -100,7 +155,7 @@ export class MyRoom extends Room<MyRoomState> {
         Matter.Composite.add(this.world, playerMatterBody);
         this.playerBodies.set(client.sessionId, playerMatterBody);
 
-        const playerState = new Player(100);
+        const playerState = new Player(client.sessionId, auth.profile.stats.health, client.auth.username);
         playerState.id = client.sessionId;
         this.state.playerEntities.set(client.sessionId, playerState);
     }
@@ -210,6 +265,7 @@ export class MyRoom extends Room<MyRoomState> {
                 bulletState.x = data.x;
                 bulletState.y = data.y;
                 bulletState.aimAngle = data.angle;
+                bulletState.damage = 0 // to ma być brane ze stałej listy z bazy
                 this.state.bulletEntities.set(bulletId, bulletState);
             }
         });

@@ -11,6 +11,7 @@ import userRoutes from "./routers/user";
 import cookieParser from "cookie-parser";
 import { PrismaClient } from "../generated/prisma";
 import * as dotenv from 'dotenv';
+import { loadWeapons, Weapons } from "./game/weapons";
 
 dotenv.config()
 
@@ -32,7 +33,8 @@ app.use("/shop", shopRoutes);
 app.use("/user", userRoutes);
 
 const gameServer = new Server({
-  transport: new uWebSocketsTransport()
+  transport: new uWebSocketsTransport(),
+  greet: false,
 });
 
 gameServer.define("lobby", CustomLobbyRoom)
@@ -50,6 +52,9 @@ gameServer.define("player_room", MyRoom)
 
 // gameServer.simulateLatency(100);
 
+await loadWeapons();
+console.log("Weapons loaded:", Object(Weapons));
+
 // API Server
 app.listen(apiPort, () => {
   console.log(`🌐 API server running at http://localhost:${apiPort}`);
@@ -65,3 +70,4 @@ app.use("/colyseus", monitor());
 app.listen(monitorPort, () => {
   console.log(`📊 Colyseus Monitor running at http://localhost:${monitorPort}/colyseus`);
 });
+

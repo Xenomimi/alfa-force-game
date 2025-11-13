@@ -10,7 +10,7 @@ interface GameProps {
     handleExit: () => void;
 }
 
-const GameComponent: React.FC<GameProps> = ({userData, gameRoom, handleExit }) => { 
+const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) => { 
     const gameInstanceRef = useRef<Game | null>(null);
     const pixiContainerRef = useRef<HTMLDivElement>(null);
     

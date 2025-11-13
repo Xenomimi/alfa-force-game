@@ -6,4 +6,5 @@ export class Bullet extends Schema {
     @type("number") aimAngle: number = 0;
     @type("number") x: number = 0;
     @type("number") y: number = 0;
+    @type("number") damage: number = 0;
 }
