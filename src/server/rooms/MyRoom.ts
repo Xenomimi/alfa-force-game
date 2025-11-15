@@ -20,6 +20,16 @@ type JwtPayload = {
     userId: number;
 };
 
+type InventoryItem = {
+    id: number;
+    profileId: number;
+    weaponId: number;
+    equipped: boolean;
+    acquiredAt: Date;
+};
+
+type Inventory = InventoryItem[];
+
 type UserInfo = {
   id: number;
   email: string;
@@ -45,13 +55,7 @@ type UserInfo = {
       intelligence: number;
       accuracy: number;
     } | null;
-    inventory: {
-      id: number;
-      profileId: number;
-      weaponId: number;
-      equipped: boolean;
-      acquiredAt: Date;
-    }[] | null;
+    inventory: Inventory | null;
   } | null;
 };
 
@@ -280,6 +284,22 @@ export class MyRoom extends Room<MyRoomState> {
                     );
                 this.state.bulletEntities.set(bulletId, bulletState);
             }
+        });
+
+        this.onMessage("switch_weapon", (client, weaponId: number) => {
+            const player = this.state.playerEntities.get(client.sessionId);
+            if (!player) return;
+
+            const profile = client.auth.profile;
+            if (!profile) return;
+
+            const weaponExists = !!Weapons[weaponId];
+            if (!weaponExists) return;
+
+            const hasWeapon = profile.inventory?.some((weapon: InventoryItem) => weapon.weaponId === weaponId) ?? false;
+            if (!hasWeapon) return;
+
+            player.currentWeaponId = weaponId;
         });
     }
 
