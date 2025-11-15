@@ -8,6 +8,8 @@ import Matter from 'matter-js';
 import { JWT } from "@colyseus/auth"
 import { JWT_SECRET } from "../routers/auth";
 import { prisma } from "../index";
+import { Weapons } from "../game/weapons";
+
 
 type Point = {
     x: number;
@@ -158,6 +160,9 @@ export class MyRoom extends Room<MyRoomState> {
         const playerState = new Player(client.sessionId, auth.profile.stats.health, client.auth.username);
         playerState.id = client.sessionId;
         this.state.playerEntities.set(client.sessionId, playerState);
+
+        client.send("all_available_weapons", Weapons);
+        client.send("available_weapons", auth.profile.inventory?.map(item => item.weaponId) || []);
     }
  
     onLeave(client: Client, options: any) {
@@ -265,7 +270,14 @@ export class MyRoom extends Room<MyRoomState> {
                 bulletState.x = data.x;
                 bulletState.y = data.y;
                 bulletState.aimAngle = data.angle;
-                bulletState.damage = 0 // to ma być brane ze stałej listy z bazy
+                // Obrażenia z zakresu broni
+                bulletState.damage = 
+                    Weapons[player.currentWeaponId].min_damage + 
+                    Math.floor(
+                        Math.random() * (
+                            Weapons[player.currentWeaponId].max_damage - Weapons[player.currentWeaponId].min_damage + 1
+                        )
+                    );
                 this.state.bulletEntities.set(bulletId, bulletState);
             }
         });

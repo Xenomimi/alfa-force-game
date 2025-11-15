@@ -34,15 +34,13 @@ export class Game {
     playerBody!: Matter.Body;
     mouseX!: number;
     mouseY!: number;
-    bullets!: Bullet[];
-    room: Room<any> | null;
+    bullets: Bullet[] = [];
+    room: Room<any>;
     roomCallBacks: any;
     accumulator: number = 0;
     fixedDelta: number = 1000 / 60; // 16.67ms
     private lastPlayerPos: Point = { x: 800, y: 300 }
     private shootSound!: HTMLAudioElement;
-    private boundHandleMouseDown: (event: MouseEvent) => void;
-    private boundHandleMouseUp: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
@@ -54,9 +52,7 @@ export class Game {
     private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
 
-    constructor(containerElement: HTMLDivElement, room: Room<any> | null) {
-        this.boundHandleMouseDown = this.handleMouseDown.bind(this);
-        this.boundHandleMouseUp = this.handleMouseUp.bind(this);
+    constructor(containerElement: HTMLDivElement, room: Room<any>) {
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         this.room = room;
@@ -78,9 +74,9 @@ export class Game {
             this.setupContainers();
             this.addPsyhics();
             this.drawMap();
+            this.addPlayer();
             this.addRoomEventHandlers();
             this.updateOtherPlayers()
-            this.addPlayer();
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
@@ -90,7 +86,7 @@ export class Game {
     }
 
     private addPlayer() {
-        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false);
+        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport);
         const speedX = 15;
         const jumpVelocity = -20;
 
@@ -163,7 +159,7 @@ export class Game {
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
-                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true);
+                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport);
                 otherPlayers[sessionId] = newPlayer;
                 
                 newPlayer.positionBuffer = [];
@@ -587,102 +583,11 @@ export class Game {
     }
 
     private handleMouseDown() {
-        if (!this.player.isAlive) return;
-        const armatureDisplay = this.player._armatureDisplay;
-        const bone = this.player._armature.getBone("bone");
-        if (!bone) return;
-
-        const localPos = new PIXI.Point(bone.global.x, bone.global.y);
-        const globalPos = armatureDisplay.toGlobal(localPos);
-        const startPos = this.viewport.toLocal(globalPos);
-
-        const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
-
-        const offsetX = Math.cos(this.player.aimAngle) * offset;
-        const offsetY = Math.sin(this.player.aimAngle) * offset;
-
-        const collisions = Matter.Query.ray(this.world.bodies, startPos, {
-            x: startPos.x + offsetX,
-            y: startPos.y + offsetY
-        });
-
-        const filtered = collisions.filter(collision => 
-            collision.bodyA !== this.player.playerMatterBody && collision.bodyB !== this.player.playerMatterBody
-        );
-
-        if (filtered.length > 0) {
-            // Jeżeli jest kolizja, nie strzelaj
-            return;
-        }
-
-        console.log("Firing bullet from:", startPos.x + offsetX, startPos.y + offsetY);
-
-        const bullet = new Bullet(
-            startPos.x + offsetX,
-            startPos.y + offsetY,
-            this.player.aimAngle,
-            this.player.id || "undefined",
-            this.gameContainer,
-            this.world
-        );
-
-        this.bullets.push(bullet);
-
-        this.room!.send("shoot", { 
-            angle: this.player.aimAngle,
-            x: startPos.x + offsetX, 
-            y: startPos.y + offsetY,
-        });
-        
-        const shootSoundInstance = new Audio(this.shootSound.src);
-        shootSoundInstance.volume = this.shootSound.volume;
-        shootSoundInstance.play();
+        this.player.shoot(this.shootSound);
 
         if (!this.shootingInterval) {
             this.shootingInterval = setInterval(() => {
-                const localPos = new PIXI.Point(bone.global.x, bone.global.y);
-                const globalPos = armatureDisplay.toGlobal(localPos);
-                const startPos = this.viewport.toLocal(globalPos);
-
-                const offset = this.player.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
-
-                const offsetX = Math.cos(this.player.aimAngle) * offset;
-                const offsetY = Math.sin(this.player.aimAngle) * offset;
-
-                const collisions = Matter.Query.ray(this.world.bodies, startPos, {
-                    x: startPos.x + offsetX,
-                    y: startPos.y + offsetY
-                });
-
-                const filtered = collisions.filter(collision => 
-                    collision.bodyA !== this.player.playerMatterBody && collision.bodyB !== this.player.playerMatterBody
-                );
-
-                if (filtered.length > 0) {
-                    // Jeżeli jest kolizja, nie strzelaj
-                    return;
-                }
-
-                const bullet = new Bullet(
-                    startPos.x + offsetX,
-                    startPos.y + offsetY,
-                    this.player.aimAngle,
-                    "1",
-                    this.gameContainer,
-                    this.world
-                );
-
-                this.bullets.push(bullet);
-
-                this.room!.send("shoot", { 
-                    angle: this.player.aimAngle,
-                    x: startPos.x + offsetX, 
-                    y: startPos.y + offsetY,
-                });
-
-                const shootSoundInstance = new Audio(this.shootSound.src);
-                shootSoundInstance.volume = this.shootSound.volume;
-                shootSoundInstance.play();
+                this.player.shoot(this.shootSound);
             }, 100);
         }
     }
@@ -697,8 +602,8 @@ export class Game {
     setupEventListeners() {
         document.addEventListener('keydown', this.boundHandleKeyDown);
         document.addEventListener('keyup', this.boundHandleKeyUp);
-        document.addEventListener('pointerdown', this.boundHandleMouseDown);
-        document.addEventListener('pointerup', this.boundHandleMouseUp);
+        document.addEventListener('pointerdown', this.handleMouseDown.bind(this));
+        document.addEventListener('pointerup', this.handleMouseUp.bind(this));
     }
 
     private handleKeyDown(event: KeyboardEvent) {
@@ -728,8 +633,8 @@ export class Game {
     removeEventListeners() {
         document.removeEventListener('keydown', this.boundHandleKeyDown);
         document.removeEventListener('keyup', this.boundHandleKeyUp);
-        document.removeEventListener('pointerdown', this.boundHandleMouseDown);
-        document.removeEventListener('pointerup', this.boundHandleMouseUp);
+        document.removeEventListener('pointerdown', this.handleMouseDown.bind(this));
+        document.removeEventListener('pointerup', this.handleMouseUp.bind(this));
         if (this.shootingInterval) {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;

@@ -1,13 +1,12 @@
 import * as PIXI from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
-import { PixiArmatureDisplay, PixiFactory, Armature } from 'dragonbones-pixijs';
+import { PixiArmatureDisplay, PixiFactory, Armature, Bone } from 'dragonbones-pixijs';
 import * as Matter from 'matter-js';
+import { Bullet } from "./pixiBullet";
+import { Room } from 'colyseus.js';
 
 type ArmatureDisplayType = PixiArmatureDisplay;
-type Point = {
-    x: number;
-    y: number;
-};
+
 type PositionSnapshot = {
     x: number;
     y: number;
@@ -21,7 +20,7 @@ export class Player {
     protected _pixiResources: any;
     _armatureDisplay!: ArmatureDisplayType;
     _armature!: Armature;
-    viewport!: Viewport;
+    viewport: Viewport;
     id: string | undefined;
     x: number;
     y: number;
@@ -37,6 +36,8 @@ export class Player {
     verticalSpeed: number;
     isAlive: boolean;
     isMoving: boolean = false;
+    weaponBone: Bone | null = null;
+    forearmBone: Bone | null = null;
     handAngle: number;
     aimAngle: number;
     dx: number;
@@ -52,11 +53,25 @@ export class Player {
     deathTime?: number;
     imagesLoaded: boolean = false;
     playerContainer: PIXI.Container;
+    parentContainer: PIXI.Container;
     factory: PixiFactory;
     playerMatterBody: Matter.Body;
     psyhicsWorld: Matter.World;
 
-    constructor(id: string | undefined, x: number, y: number, parentContainer: PIXI.Container, psyhicsWorld: Matter.World, gravity: boolean = true) {
+    globalBulletList: Bullet[] = [];
+    gameRoom: Room<any>;
+
+    constructor(
+        id: string | undefined, 
+        x: number, 
+        y: number, 
+        parentContainer: PIXI.Container, 
+        psyhicsWorld: Matter.World, 
+        gravity: boolean = false,
+        globalBulletList: Bullet[],
+        gameRoom: Room<any>,
+        viewport: Viewport
+    ) {
         this.isAlive = true;
         this.id = id;
         this.width = 36;
@@ -74,7 +89,11 @@ export class Player {
         this.handAngle = 0;
         this.dx = 0;
         this.dy = 0;
+        this.parentContainer = parentContainer;
         this.psyhicsWorld = psyhicsWorld;
+        this.globalBulletList = globalBulletList;
+        this.gameRoom = gameRoom;
+        this.viewport = viewport;
         // this.maxHealth = 100;
         // this.health = this.maxHealth;
         // this.isAlive = true;
@@ -107,7 +126,7 @@ export class Player {
         
         this.init(this.playerContainer);
         this.drawPlayerName();
-        parentContainer.addChild(this.playerContainer);
+        this.parentContainer.addChild(this.playerContainer);
     }
 
     
@@ -126,7 +145,10 @@ export class Player {
 
         playerContainer.addChild(this._armatureDisplay);
 
-        await this.setGun(this._armature);
+        this.weaponBone = this._armature.getBone("bone");
+        this.forearmBone = this._armature.getBone("forearm");
+
+        await this.setGun();
     }
 
     loadTextures() {
@@ -148,12 +170,11 @@ export class Player {
 
     updateHandPosition(mouseX: number, mouseY: number, viewport: Viewport): void {
         if (!this._armature || !this._armatureDisplay) return;
-        const bone = this._armature.getBone("forearm");
-        if (!bone) return;
+        if (!this.forearmBone) return;
 
         // pobieramy pozycję kości w GLOBAL space
         const boneGlobal = this._armatureDisplay.toGlobal(
-            new PIXI.Point(bone.global.x, bone.global.y)
+            new PIXI.Point(this.forearmBone.global.x, this.forearmBone.global.y)
         );
 
         // konwertujemy ją do viewport space
@@ -178,14 +199,13 @@ export class Player {
         }
 
         // ustawiamy rotację na kości
-        bone.offset.rotation = this.handAngle;
-        bone.invalidUpdate();
+        this.forearmBone.offset.rotation = this.handAngle;
+        this.forearmBone.invalidUpdate();
     }
 
     updateRemoteHandPositionAngle(): void {
         if (!this._armature || !this._armatureDisplay) return;
-        const bone = this._armature.getBone("forearm");
-        if (!bone) return;
+        if (!this.forearmBone) return;
 
         const aimAngle = Math.atan2(this.dy, this.dx);
         this.aimAngle = aimAngle; // nowa zmienna przechowująca kąt do strzału
@@ -201,13 +221,13 @@ export class Player {
         }
 
         // ustawiamy rotację na kości
-        bone.offset.rotation = this.handAngle;
-        bone.invalidUpdate();
+        this.forearmBone.offset.rotation = this.handAngle;
+        this.forearmBone.invalidUpdate();
     }
 
 
-    async setGun(armature: Armature) {
-        const slot = armature.getSlot('bone')!;
+    async setGun() {
+        const slot = this._armature.getSlot('bone')!;
 
         try {
             const tex: PIXI.Texture = PIXI.Assets.get('gun');
@@ -233,6 +253,55 @@ export class Player {
         } catch (error) {
             console.error('Błąd podczas ustawiania tekstury broni:', error);
         }
+    }
+
+    shoot(shootSound: HTMLAudioElement) {
+        if (!this.isAlive) return;
+        if (!this.weaponBone) return;
+
+        const localPos = new PIXI.Point(this.weaponBone.global.x, this.weaponBone.global.y);
+        const globalPos = this._armatureDisplay.toGlobal(localPos);
+        const startPos = this.viewport.toLocal(globalPos);
+
+        const offset = this.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
+
+        const offsetX = Math.cos(this.aimAngle) * offset;
+        const offsetY = Math.sin(this.aimAngle) * offset;
+
+        const collisions = Matter.Query.ray(this.psyhicsWorld.bodies, startPos, {
+            x: startPos.x + offsetX,
+            y: startPos.y + offsetY
+        });
+
+        const filtered = collisions.filter(collision => 
+            collision.bodyA !== this.playerMatterBody && collision.bodyB !== this.playerMatterBody
+        );
+
+        if (filtered.length > 0) {
+            // Jeżeli jest kolizja, nie strzelaj
+            return;
+        }
+
+        const bullet = new Bullet(
+            startPos.x + offsetX,
+            startPos.y + offsetY,
+            this.aimAngle,
+            this.id || "undefined",
+            this.parentContainer,
+            this.psyhicsWorld
+        );
+
+        this.globalBulletList.push(bullet);
+
+        this.gameRoom.send("shoot", { 
+            angle: this.aimAngle,
+            x: startPos.x + offsetX, 
+            y: startPos.y + offsetY,
+        });
+        
+        const shootSoundInstance = new Audio(shootSound.src);
+        shootSoundInstance.volume = shootSound.volume;
+        shootSoundInstance.play();
     }
 
 // drawDeathAnimation() {
