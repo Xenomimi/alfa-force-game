@@ -6,7 +6,7 @@ import { UserData } from '../App';
 
 interface GameProps {
     userData: UserData | null;
-    gameRoom: Room | null;
+    gameRoom: Room;
     handleExit: () => void;
 }
 

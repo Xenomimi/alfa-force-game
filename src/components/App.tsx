@@ -29,7 +29,7 @@ const App: React.FC = () => {
     const clientRef = useRef<Client>(null);
     const [isClientReady, setIsClientReady] = useState(false);
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
-    const [gameRoom, setGameRoom] = useState<Room | null>(null);
+    const [gameRoom, setGameRoom] = useState<Room | null>();
     const [userData, setUserData] = useState<UserData>({ loggedIn: false, user: null, token: '' });
 
     const handleLogin = async () => {
@@ -134,8 +134,10 @@ const App: React.FC = () => {
         );
     }
 
-    if (screen === 'game') { 
-        return <GameComponent userData={userData} gameRoom={gameRoom} handleExit={handleGameExit}/>; 
+    if (gameRoom != null) {
+        if (screen === 'game') { 
+            return <GameComponent userData={userData} gameRoom={gameRoom} handleExit={handleGameExit}/>; 
+        }
     }
 };
 

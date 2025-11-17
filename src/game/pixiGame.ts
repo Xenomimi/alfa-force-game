@@ -7,6 +7,7 @@ import { Player } from "./pixiPlayer";
 import { Bullet } from "./pixiBullet";
 import { CameraController } from "./CameraController";
 import mapData from "../assets/map_data.json";
+import { Weapon } from "../server/game/weapons";
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -16,6 +17,26 @@ const collisionObjects = collisionLayer.objects!;
 type Point = {
     x: number;
     y: number;
+};
+
+type PlayerInputSchema = {
+    left: boolean;
+    right: boolean;
+    jump: boolean;
+};
+
+type PlayerSchema = {
+    id: string;
+    name: string;
+    health: number;
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    lastInputTick: number;
+    currentWeaponId: number;
+    ammo: number;
+    input: PlayerInputSchema;
 };
 
 export class Game {
@@ -39,6 +60,9 @@ export class Game {
     roomCallBacks: any;
     accumulator: number = 0;
     fixedDelta: number = 1000 / 60; // 16.67ms
+    allWeapons: Record<number, Weapon> = {};
+    userWeapons: number[] = [];
+    isSwitchingWeapon: boolean = false;
     private lastPlayerPos: Point = { x: 800, y: 300 }
     private shootSound!: HTMLAudioElement;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
@@ -49,15 +73,33 @@ export class Game {
         tick: number;
         input: {left: boolean, right: boolean, jump: boolean};
     }> = [];
+    private currentWeaponIndex: number = 0;
     private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
 
     constructor(containerElement: HTMLDivElement, room: Room<any>) {
+        
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         this.room = room;
-        this.roomCallBacks = getStateCallbacks(this.room!);
+        this.room.onMessage("all_available_weapons", (weapons: Record<number, Weapon>) => {
+            this.allWeapons = weapons;
+            console.log("all_available_weapons received", this.allWeapons);
+        });
+        this.room.onMessage("available_weapons", (userWeapons: number[]) => {
+            this.userWeapons = userWeapons;
+            console.log("user_weapons received", this.userWeapons);
+        });
 
+        this.room.onMessage("weapon_switched", (newWeaponId: number) => {
+            this.player.setGun(newWeaponId);
+
+            // lokalnie aktualizujemy index (żeby UI wiedziało którą broń pokazywać)
+            this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
+
+            console.log("weapon_switched received", newWeaponId);
+        });
+        this.roomCallBacks = getStateCallbacks(this.room!);
         (async () => {
             this.app = new PIXI.Application(); // ← pierwszy krok
             await this.app.init({
@@ -70,7 +112,7 @@ export class Game {
             initDevtools({ app: this.app });
             containerElement.appendChild(this.app.canvas);
             this.setupCoreSystems();
-            await this.loadAssets();
+            await this.loadAssets(this.allWeapons);
             this.setupContainers();
             this.addPsyhics();
             this.drawMap();
@@ -86,7 +128,7 @@ export class Game {
     }
 
     private addPlayer() {
-        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport);
+        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport, this.userWeapons[0]);
         const speedX = 15;
         const jumpVelocity = -20;
 
@@ -144,7 +186,7 @@ export class Game {
     }
 
     private addRoomEventHandlers() {
-        this.roomCallBacks(this.room!.state).playerEntities.onAdd((player: any, sessionId: string) => {
+        this.roomCallBacks(this.room!.state).playerEntities.onAdd((player: PlayerSchema, sessionId: string) => {
             const entity = new PIXI.Graphics().rect(0, 0, 36, 140).fill({color: 0x0000ff });
             entity.pivot.set(18, 70);
             this.testContainer.addChild(entity);
@@ -159,7 +201,7 @@ export class Game {
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
-                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport);
+                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport, player.currentWeaponId);
                 otherPlayers[sessionId] = newPlayer;
                 
                 newPlayer.positionBuffer = [];
@@ -555,12 +597,24 @@ export class Game {
         this.setupEventListeners();
     }
 
-    private async loadAssets() {
-        await PIXI.Assets.load([
-            { alias: 'background', src: './map.jpg' },
-            { alias: 'foreground', src: './foreground.png' },
-            { alias: 'gun', src: '/1654.png' }
-        ]);
+    private async loadAssets(weapons: Record<number, Weapon>) {
+        const baseAssets = [
+            { alias: "background", src: "./map.jpg" },
+            { alias: "foreground", src: "./foreground.png" },
+        ];
+
+        const weaponAssets = Object.values(weapons).map(weapon => {
+            return {
+                alias: `weapon_${weapon.id}`,
+                src: `/weapons/${weapon.id}.png`
+            };
+        });
+
+        const allAssets = [...baseAssets, ...weaponAssets];
+
+        console.log("Loading assets:", allAssets);
+
+        await PIXI.Assets.load(allAssets);
 
         // this.player.loadTextures();
         // for (let id in otherPlayers) {
@@ -599,11 +653,35 @@ export class Game {
         }
     }
 
+    private handleMouseWheel(event: WheelEvent) {
+        if (this.isSwitchingWeapon || !this.userWeapons || this.userWeapons.length === 0) {
+            return;
+        }
+
+        let direction: string | null = null;
+
+        if (event.deltaY < 0) {
+            direction = "next";
+        } else if (event.deltaY > 0) {
+            direction = "previous";
+        }
+
+        if (direction) {
+            this.room.send("switch_weapon", { direction });
+            this.isSwitchingWeapon = true;
+
+            setTimeout(() => {
+                this.isSwitchingWeapon = false;
+            }, 50);
+        }
+    }
+
     setupEventListeners() {
         document.addEventListener('keydown', this.boundHandleKeyDown);
         document.addEventListener('keyup', this.boundHandleKeyUp);
         document.addEventListener('pointerdown', this.handleMouseDown.bind(this));
         document.addEventListener('pointerup', this.handleMouseUp.bind(this));
+        document.addEventListener('wheel', this.handleMouseWheel.bind(this));
     }
 
     private handleKeyDown(event: KeyboardEvent) {

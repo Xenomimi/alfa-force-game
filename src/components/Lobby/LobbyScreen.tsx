@@ -37,8 +37,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame
     { name: 'Sniper Valley', mode: 'Deathmatch', players: '3/8', ping: '23ms' },
     { name: 'City Ruins', mode: 'Deathmatch', players: '4/10', ping: '155ms' },
   ];
-
-
+  
   const handleNavigate = (s: Section) => {
     setActiveSection(s);
     console.log(`Nawigacja do sekcji: ${s}`);
@@ -70,7 +69,6 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame
       if (!lobby.current) {
         lobby.current = await client!.joinOrCreate("lobby");
       }
-        
       // nasłuchiwanie eventów
       lobby.current!.onMessage("rooms", (rooms: any[]) => {
         setRooms(rooms);

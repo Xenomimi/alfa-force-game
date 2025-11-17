@@ -18,7 +18,7 @@ export class Player extends Schema {
   @type("number") lastInputTick: number = 0; // Numer ostatniego przetworzonego inputu
 
   @type("number") currentWeaponId: number = 1;
-  @type("number") ammo = 30;
+  @type("number") ammo: number = 30;
 
   @type(PlayerInput) input = new PlayerInput();
 

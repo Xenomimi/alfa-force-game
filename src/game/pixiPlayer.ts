@@ -30,6 +30,7 @@ export class Player {
     height: number;
     bottom: number;
     playerName: string = "";
+    playerWeaponId: number;
     shootingPointOffsetX: number = 60;
     speed: number;
     gravity: number;
@@ -70,7 +71,8 @@ export class Player {
         gravity: boolean = false,
         globalBulletList: Bullet[],
         gameRoom: Room<any>,
-        viewport: Viewport
+        viewport: Viewport,
+        playerWeaponId: number 
     ) {
         this.isAlive = true;
         this.id = id;
@@ -91,6 +93,7 @@ export class Player {
         this.dy = 0;
         this.parentContainer = parentContainer;
         this.psyhicsWorld = psyhicsWorld;
+        this.playerWeaponId = playerWeaponId;
         this.globalBulletList = globalBulletList;
         this.gameRoom = gameRoom;
         this.viewport = viewport;
@@ -148,7 +151,8 @@ export class Player {
         this.weaponBone = this._armature.getBone("bone");
         this.forearmBone = this._armature.getBone("forearm");
 
-        await this.setGun();
+
+        await this.setGun(this.playerWeaponId);
     }
 
     loadTextures() {
@@ -226,11 +230,11 @@ export class Player {
     }
 
 
-    async setGun() {
+    async setGun(gunId: number) {
         const slot = this._armature.getSlot('bone')!;
 
         try {
-            const tex: PIXI.Texture = PIXI.Assets.get('gun');
+            const tex: PIXI.Texture = PIXI.Assets.get(`weapon_${gunId}`);
             const newDisplay = new PIXI.Sprite(tex);
             
             newDisplay.anchor.set(0.1, 0.4);
@@ -243,7 +247,6 @@ export class Player {
 
             // Podmieniamy cały display na wrapper
             const list = slot.displayList;
-            console.log('Current display list:', list);
             list[0] = cont;
             slot.displayList = list;
             slot.displayIndex = 0;

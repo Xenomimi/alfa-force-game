@@ -166,7 +166,7 @@ export class MyRoom extends Room<MyRoomState> {
         this.state.playerEntities.set(client.sessionId, playerState);
 
         client.send("all_available_weapons", Weapons);
-        client.send("available_weapons", auth.profile.inventory?.map(item => item.weaponId) || []);
+        client.send("available_weapons", auth.profile.inventory?.map((item) => item.weaponId) || []);
     }
  
     onLeave(client: Client, options: any) {
@@ -286,20 +286,30 @@ export class MyRoom extends Room<MyRoomState> {
             }
         });
 
-        this.onMessage("switch_weapon", (client, weaponId: number) => {
+        this.onMessage("switch_weapon", (client, data) => {
             const player = this.state.playerEntities.get(client.sessionId);
             if (!player) return;
+            const profileWeapons = client.auth.profile.inventory?.map((w: InventoryItem) => w.weaponId) ?? [];
+            if (profileWeapons.length === 0) return;
 
-            const profile = client.auth.profile;
-            if (!profile) return;
+            const currentId = player.currentWeaponId;
+            const currentIndex = profileWeapons.indexOf(currentId);
 
-            const weaponExists = !!Weapons[weaponId];
-            if (!weaponExists) return;
+            if (currentIndex === -1) return;
 
-            const hasWeapon = profile.inventory?.some((weapon: InventoryItem) => weapon.weaponId === weaponId) ?? false;
-            if (!hasWeapon) return;
+            let newIndex;
 
-            player.currentWeaponId = weaponId;
+            if (data.direction === "next") {
+                newIndex = (currentIndex + 1) % profileWeapons.length;
+            } else {
+                newIndex = (currentIndex - 1 + profileWeapons.length) % profileWeapons.length;
+            }
+
+            const newWeaponId = profileWeapons[newIndex];
+
+            player.currentWeaponId = newWeaponId;
+
+            client.send("weapon_switched", newWeaponId);
         });
     }
 
