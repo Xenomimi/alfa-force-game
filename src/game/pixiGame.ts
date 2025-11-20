@@ -8,6 +8,7 @@ import { Bullet } from "./pixiBullet";
 import { CameraController } from "./CameraController";
 import mapData from "../assets/map_data.json";
 import { Weapon } from "../server/game/weapons";
+import { HudState } from '../components/Game/GameComponent';
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -76,30 +77,35 @@ export class Game {
     private currentWeaponIndex: number = 0;
     private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
+    private onHudUpdate?: (data: Partial<HudState>) => void;
 
-    constructor(containerElement: HTMLDivElement, room: Room<any>) {
-        
+    constructor(containerElement: HTMLDivElement, room: Room<any>, onHudUpdate?: (data: Partial<HudState>) => void) {
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         this.room = room;
+        this.onHudUpdate = onHudUpdate;
         this.room.onMessage("all_available_weapons", (weapons: Record<number, Weapon>) => {
             this.allWeapons = weapons;
             console.log("all_available_weapons received", this.allWeapons);
         });
         this.room.onMessage("available_weapons", (userWeapons: number[]) => {
             this.userWeapons = userWeapons;
+            if (this.userWeapons.length > 0 && this.onHudUpdate) {
+                 this.onHudUpdate({ weaponId: this.userWeapons[0] }); 
+            }
             console.log("user_weapons received", this.userWeapons);
         });
 
         this.room.onMessage("weapon_switched", (newWeaponId: number) => {
             this.player.setGun(newWeaponId);
-
-            // lokalnie aktualizujemy index (żeby UI wiedziało którą broń pokazywać)
             this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
-
+            if (this.onHudUpdate) {
+                this.onHudUpdate({ weaponId: newWeaponId });
+            }
             console.log("weapon_switched received", newWeaponId);
         });
         this.roomCallBacks = getStateCallbacks(this.room!);
+
         (async () => {
             this.app = new PIXI.Application(); // ← pierwszy krok
             await this.app.init({
@@ -208,6 +214,13 @@ export class Game {
                 // Synchronizuj jego pozycję z serwera
                 this.roomCallBacks(player).onChange(() => {
                     const other = otherPlayers[sessionId];
+
+                    if (player.currentWeaponId !== undefined && other.playerWeaponId !== player.currentWeaponId) {
+                        console.log(`Gracz ${sessionId} zmienia broń na: ${player.currentWeaponId}`);
+                        other.playerWeaponId = player.currentWeaponId;
+                        other.setGun(player.currentWeaponId);
+                    }
+
                     if (other && other.playerMatterBody) {
                         // Aktualizuj pozycję ciała fizycznego Matter.js
                         other.dx = player.dx;

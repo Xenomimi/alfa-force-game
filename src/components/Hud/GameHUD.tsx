@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './css/GameHUD.css';
 import LobbyHeader from '../Lobby/LobbyHeader';
 import { UserData } from '../App';
+import { HudState } from '../Game/GameComponent';
 
 /* Dummy-dane – w prawdziwej grze leci to z WebSocketa lub kontekstu gry */
 const mockScoreboard = [
@@ -14,10 +15,11 @@ const mockScoreboard = [
 
 interface GameHUDProps {
   userData: UserData | null; 
-  onGameExit: () => void 
+  onGameExit: () => void;
+  hudState: HudState;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => {
   const [showScore, setShowScore] = useState(false);
 
   useEffect(() => {
@@ -86,25 +88,28 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit }) => {
       )}
 
       {/* dolny HUD */}
-      <div className="hud-bottom">
-        <div className="hud-info-group">
-          <div className="hud-label">Granaty: 5</div>
-          <div className="hud-weapon hud-outline">
-            <img src="/1654.png" alt="Broń" />
+        <div className="hud-bottom">
+          <div className="hud-info-group">
+            <div className="hud-label">Granaty: 5</div>
+            <div className="hud-weapon hud-outline">
+              {/* Dynamiczne ID broni */}
+              <img src={`/weapons/${hudState.weaponId}.png`} alt="Broń" />
+            </div>
           </div>
-        </div>
 
-        <div className="hud-bars">
-          <div className="hud-bar ammo">
-            <span className="hud-label">Amunicja</span>
-            <span className="hud-value">6</span>
-          </div>
-          <div className="hud-bar health">
-            <span className="hud-label">Punkty życia</span>
-            <span className="hud-value">250 / 250</span>
+          <div className="hud-bars">
+            <div className="hud-bar ammo">
+              <span className="hud-label">Amunicja</span>
+              {/* Dynamiczna amunicja */}
+              <span className="hud-value">{hudState.ammo} / {hudState.maxAmmo}</span>
+            </div>
+            <div className="hud-bar health">
+              <span className="hud-label">Punkty życia</span>
+              {/* Dynamiczne życie */}
+              <span className="hud-value">{hudState.health} / {hudState.maxHealth}</span>
+            </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };

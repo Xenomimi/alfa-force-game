@@ -4,6 +4,14 @@ import { Game } from '../../game/pixiGame.ts';
 import { Room } from 'colyseus.js';
 import { UserData } from '../App';
 
+export interface HudState {
+    weaponId: number;
+    ammo: number;
+    maxAmmo: number;
+    health: number;
+    maxHealth: number;
+}
+
 interface GameProps {
     userData: UserData | null;
     gameRoom: Room;
@@ -13,7 +21,15 @@ interface GameProps {
 const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) => { 
     const gameInstanceRef = useRef<Game | null>(null);
     const pixiContainerRef = useRef<HTMLDivElement>(null);
-    
+    const [hudState, setHudState] = useState<HudState>({
+        weaponId: 1,
+        ammo: 30,
+        maxAmmo: 30,
+        health: 100,
+        maxHealth: 100
+    });
+
+
     const handleGameExit = () => {
         if (gameInstanceRef.current) {
         gameInstanceRef.current.stop();
@@ -49,7 +65,12 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
             updateCanvasSize(container);
             window.addEventListener('resize', updateCanvasSize.bind(null, container));
 
-            const game = new Game(container, gameRoom);
+            const game = new Game(container, gameRoom, (updates: Partial<HudState>) => {
+                            setHudState(prevState => ({
+                                ...prevState,
+                                ...updates
+                            }));
+                        });
             gameInstanceRef.current = game;
 
             return () => {
@@ -65,7 +86,7 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
     return (    
         <div className="game-wrapper">
             <div id="pixiContainer" ref={pixiContainerRef}>
-                <GameHUD userData={userData} onGameExit={handleGameExit} />
+                <GameHUD userData={userData} onGameExit={handleGameExit} hudState={hudState}/>
             </div>
         </div>
     ) 
