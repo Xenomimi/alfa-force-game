@@ -20,7 +20,7 @@ export interface User {
 
 export interface UserData {
   loggedIn: boolean;
-  user: User | null;
+  user: User;
   token: string;
 }
 
@@ -30,7 +30,7 @@ const App: React.FC = () => {
     const [isClientReady, setIsClientReady] = useState(false);
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
     const [gameRoom, setGameRoom] = useState<Room | null>();
-    const [userData, setUserData] = useState<UserData>({ loggedIn: false, user: null, token: '' });
+    const [userData, setUserData] = useState<UserData | null>(null);
 
     const handleLogin = async () => {
         // sprawdź sesję po zalogowaniu
@@ -67,7 +67,7 @@ const App: React.FC = () => {
         } catch (err) {
         console.error("Błąd przy opuszczaniu pokoju:", err);
         }
-    }
+    };
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -99,13 +99,15 @@ const App: React.FC = () => {
         checkAuth();
     }, []);
 
+
+
     useEffect(() => {
-        if (screen === 'lobby' && userData.token && !clientRef.current) {
+        if (screen === 'lobby' && userData && userData.token && !clientRef.current) {
             clientRef.current = new Client("ws://localhost:2567");
             clientRef.current.auth.token = userData.token;
             setIsClientReady(true);
         }
-    }, [screen, userData.token]);
+    }, [screen, userData]);
 
 
     if (screen === 'login') {
@@ -113,23 +115,24 @@ const App: React.FC = () => {
     }
 
     if (screen === 'lobby') {
+
+        if (!userData) {
+            return <div>Ładowanie użytkownika...</div>;
+        }
+
         if (!isClientReady) {
-            return (
-                <div style={{ padding: 24, color: '#fff', textAlign: 'center' }}>
-                    <p>Inicjalizacja klienta...</p>
-                </div>
-            );
+            return <div>Inicjalizacja klienta...</div>;
         }
 
         return (
             <LobbyScreen
-            userData={userData}
-            client={clientRef.current}
-            onStartGame={(room: Room) => {
-                setGameRoom(room); // zapisz pokój
-                setScreen('game');
-            }}
-            onLogout={handleLogout}
+                userData={userData}
+                client={clientRef.current}
+                onStartGame={(room: Room) => {
+                    setGameRoom(room);
+                    setScreen('game');
+                }}
+                onLogout={handleLogout}
             />
         );
     }

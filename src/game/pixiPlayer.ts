@@ -234,6 +234,9 @@ export class Player {
         const slot = this._armature.getSlot('bone')!;
 
         try {
+            
+            
+            
             const tex: PIXI.Texture = PIXI.Assets.get(`weapon_${gunId}`);
             const newDisplay = new PIXI.Sprite(tex);
             

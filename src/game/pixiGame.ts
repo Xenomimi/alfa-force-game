@@ -220,7 +220,7 @@ export class Game {
                                                 dy: player.dy || 0,
                                                 timestamp: Date.now()
                                             });
-
+                        
                         if (other.positionBuffer.length > 20) other.positionBuffer.shift();
                     }
                 });

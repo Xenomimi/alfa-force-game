@@ -127,7 +127,7 @@ const ShopScreen: React.FC = () => {
           {filtered.map(it => (
             <div key={ it.id } className="item-card">
               <div className="item-thumb">
-                <img src="https://dummyimage.com/600x400/000/fff"/>
+                <img src={`/weapons/${it.id}.png`} alt="Zdjęcie"/>
               </div>
 
               <div className="item-stats">

@@ -31,6 +31,9 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({ health: -1, armor: -1, strength: -1, agility: -1, intelligence: -1, accuracy: -1 });
   // const userStats: UserStats = {}; 
+  if (!userData) {
+    return <div>Ładowanie profilu...</div>;
+  }
 
   useEffect(() => {
     const populateData = async () => {
@@ -93,9 +96,10 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
     return(
       <>
         <span>{it.name}:</span><span>{st.bonusValue}</span>
-      </>
+      </> 
     );
   };  
+  
   return (
     <div className="profile-root">
       <aside className="profile-left">
@@ -103,8 +107,9 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
           <div className="avatar">
             <img src="https://dummyimage.com/100x100/000/fff" alt="Avatar gracza"/>
           </div>
-          <h3 className="player-name">{userData?.user.username}</h3>
-
+          <h3 className="player-name">  
+            {userData.user.username}
+          </h3>
           <div className="stats-mini">
             <div><span>Poziom</span><strong>{userData?.user.profile.level}</strong></div>
             <div><span>Osiągnięcia</span><strong>{userData?.user.profile.experience}</strong></div>
@@ -167,7 +172,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
             <div key={it.id} className="item-card">
               {/* miniatura */}
               <div className="item-thumb">
-                <img src="1654.png" alt="Zdjęcie"/>
+                <img src={`/weapons/${it.id}.png`} alt="Zdjęcie"/>
               </div>
 
               {/* ▶ STATYSTYKI */}
