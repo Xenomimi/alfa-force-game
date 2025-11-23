@@ -4,6 +4,7 @@ import { PixiArmatureDisplay, PixiFactory, Armature, Bone } from 'dragonbones-pi
 import * as Matter from 'matter-js';
 import { Bullet } from "./pixiBullet";
 import { Room } from 'colyseus.js';
+import { MapSchema } from '@colyseus/schema';
 
 type ArmatureDisplayType = PixiArmatureDisplay;
 
@@ -58,7 +59,8 @@ export class Player {
     factory: PixiFactory;
     playerMatterBody: Matter.Body;
     psyhicsWorld: Matter.World;
-
+    ammo: number = 0; 
+    reloadingWeapons: MapSchema<boolean> = new MapSchema<boolean>();
     globalBulletList: Bullet[] = [];
     gameRoom: Room<any>;
 

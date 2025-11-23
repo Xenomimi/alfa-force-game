@@ -1,4 +1,4 @@
-import { Schema, type } from "@colyseus/schema";
+import { Schema, type, MapSchema } from "@colyseus/schema";
 
 export class PlayerInput extends Schema {
   @type("boolean") left: boolean = false;
@@ -19,8 +19,11 @@ export class Player extends Schema {
 
   @type("number") currentWeaponId: number = 1;
   @type("number") ammo: number = 30;
+  @type("number") maxAmmo: number = 30;
 
   @type(PlayerInput) input = new PlayerInput();
+  @type({ map: "boolean" }) reloadingWeapons = new MapSchema<boolean>();
+  weaponMagazines: Map<number, number> = new Map();
 
   constructor(sessionId: string, health: number, name: string) {
     super();

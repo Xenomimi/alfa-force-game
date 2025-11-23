@@ -163,8 +163,26 @@ export class MyRoom extends Room<MyRoomState> {
 
         const playerState = new Player(client.sessionId, auth.profile.stats.health, client.auth.username);
         playerState.id = client.sessionId;
-        this.state.playerEntities.set(client.sessionId, playerState);
 
+        const userInventory = auth.profile.inventory || [];
+        const userWeaponIds = userInventory.map((item) => item.weaponId);
+
+        if (userWeaponIds.length > 0) {
+            playerState.currentWeaponId = userWeaponIds[0];
+        }
+        userWeaponIds.forEach(weaponId => {
+            const stats = Weapons[weaponId];
+            if (stats) {
+                // Zapisz max ammo do pamięci podręcznej gracza
+                playerState.weaponMagazines.set(weaponId, stats.amunition);
+            }
+        });
+        if (userWeaponIds.length === 0 && Weapons[1]) {
+            playerState.weaponMagazines.set(1, Weapons[1].amunition);
+        }
+        playerState.ammo = playerState.weaponMagazines.get(playerState.currentWeaponId) || 0;
+        this.state.playerEntities.set(client.sessionId, playerState);
+        
         client.send("all_available_weapons", Weapons);
         client.send("available_weapons", auth.profile.inventory?.map((item) => item.weaponId) || []);
     }
@@ -175,6 +193,30 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     // --- LOGIKA GRY ---
+
+    startReload(player: Player, weaponId: number) {
+        const weaponIdStr = weaponId.toString();
+
+        if (player.reloadingWeapons.get(weaponIdStr)) return;
+
+        const weaponStats = Weapons[weaponId];
+        if (!weaponStats) {
+            console.log("Weapon stats not found for id:", weaponId);
+            return;
+        }
+        
+        player.reloadingWeapons.set(weaponIdStr, true);
+
+        this.clock.setTimeout(() => {
+            player.weaponMagazines.set(weaponId, weaponStats.amunition);
+            // Usuń flagę przeładowania
+            player.reloadingWeapons.delete(weaponIdStr);
+            if (player.currentWeaponId === weaponId) {
+                player.ammo = weaponStats.amunition;
+            }
+            console.log(`Weapon ${weaponId} reloaded!`);
+        }, weaponStats.reloadTime);
+    }
 
     initEngine() {
         // Nowa flaga ignoreGravity dla ciał w Matter.js
@@ -265,8 +307,25 @@ export class MyRoom extends Room<MyRoomState> {
         });
 
         this.onMessage("shoot", (client, data) => {
-            const player = this.state.playerEntities.get(client.sessionId);
-            if (player) {
+                const player = this.state.playerEntities.get(client.sessionId);
+                if (!player) return;
+
+                const weaponIdStr = player.currentWeaponId.toString();
+
+                // 1. Jeśli ta konkretna broń się przeładowuje - STOP
+                if (player.reloadingWeapons.get(weaponIdStr)) {
+                    return;
+                }
+
+                // 2. Jeśli amunicja <= 0, spróbuj przeładować i STOP
+                if (player.ammo <= 0) {
+                    this.startReload(player, player.currentWeaponId);
+                    return;
+                }
+
+                // 3. Strzał właściwy
+                player.ammo -= 1;
+                player.weaponMagazines.set(player.currentWeaponId, player.ammo);
                 const bulletId = nanoid();
                 const bulletState = new Bullet();
                 bulletState.id = bulletId;
@@ -283,22 +342,24 @@ export class MyRoom extends Room<MyRoomState> {
                         )
                     );
                 this.state.bulletEntities.set(bulletId, bulletState);
+                if (player.ammo <= 0) {
+                    this.startReload(player, player.currentWeaponId);
+                }    
             }
-        });
+        );
 
         this.onMessage("switch_weapon", (client, data) => {
             const player = this.state.playerEntities.get(client.sessionId);
             if (!player) return;
+
             const profileWeapons = client.auth.profile.inventory?.map((w: InventoryItem) => w.weaponId) ?? [];
             if (profileWeapons.length === 0) return;
 
             const currentId = player.currentWeaponId;
             const currentIndex = profileWeapons.indexOf(currentId);
-
             if (currentIndex === -1) return;
 
             let newIndex;
-
             if (data.direction === "next") {
                 newIndex = (currentIndex + 1) % profileWeapons.length;
             } else {
@@ -306,8 +367,21 @@ export class MyRoom extends Room<MyRoomState> {
             }
 
             const newWeaponId = profileWeapons[newIndex];
-
             player.currentWeaponId = newWeaponId;
+
+            // Wczytaj ammo z pamięci
+            let savedAmmo = player.weaponMagazines.get(newWeaponId);
+            if (savedAmmo === undefined) {
+                 // Fallback do pełnego magazynka (pierwsze użycie)
+                 savedAmmo = Weapons[newWeaponId]?.amunition || 0;
+                 player.weaponMagazines.set(newWeaponId, savedAmmo);
+            }
+            player.ammo = savedAmmo;
+
+            // Jeśli wyciągnęliśmy pustą broń, która się NIE ładuje -> ładuj
+            if (player.ammo <= 0 && !player.reloadingWeapons.get(newWeaponId.toString())) {
+                this.startReload(player, newWeaponId);
+            }
 
             client.send("weapon_switched", newWeaponId);
         });

@@ -29,14 +29,11 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
         maxHealth: 100
     });
 
-
     const handleGameExit = () => {
         if (gameInstanceRef.current) {
-        gameInstanceRef.current.stop();
-        gameInstanceRef.current = null;
-
+            gameInstanceRef.current.stop();
+            gameInstanceRef.current = null;
         }
-        console.log("GameComponent: handleGameExit called");
         handleExit();
     };
 

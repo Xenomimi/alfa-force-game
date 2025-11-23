@@ -9,6 +9,7 @@ import { CameraController } from "./CameraController";
 import mapData from "../assets/map_data.json";
 import { Weapon } from "../server/game/weapons";
 import { HudState } from '../components/Game/GameComponent';
+import { MapSchema } from '@colyseus/schema';
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -37,6 +38,8 @@ type PlayerSchema = {
     lastInputTick: number;
     currentWeaponId: number;
     ammo: number;
+    maxAmmo: number;
+    reloadingWeapons: MapSchema<boolean>;
     input: PlayerInputSchema;
 };
 
@@ -69,6 +72,7 @@ export class Game {
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
+    private fireRate: number = 1000; // domyślny czas między strzałami
     private inputSequence: number = 0;
     private pendingInputs: Array<{
         tick: number;
@@ -91,23 +95,25 @@ export class Game {
         this.room.onMessage("available_weapons", (userWeapons: number[]) => {
             this.userWeapons = userWeapons;
             if (this.userWeapons.length > 0 && this.onHudUpdate) {
-                 this.onHudUpdate({ weaponId: this.userWeapons[0] }); 
+                 this.onHudUpdate({ weaponId: this.userWeapons[0] });// tymczasowe wartości amunicji
+                 this.fireRate = this.allWeapons[this.userWeapons[0]].fireInterval;
             }
             console.log("user_weapons received", this.userWeapons);
         });
 
         this.room.onMessage("weapon_switched", (newWeaponId: number) => {
             this.player.setGun(newWeaponId);
+            this.player.playerWeaponId = newWeaponId; 
             this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
+            this.fireRate = this.allWeapons[newWeaponId]?.fireInterval;
             if (this.onHudUpdate) {
                 this.onHudUpdate({ weaponId: newWeaponId });
             }
-            console.log("weapon_switched received", newWeaponId);
         });
         this.roomCallBacks = getStateCallbacks(this.room!);
 
         (async () => {
-            this.app = new PIXI.Application(); // ← pierwszy krok
+            this.app = new PIXI.Application();
             await this.app.init({
                 width: 1920,
                 height: 1080,
@@ -199,7 +205,26 @@ export class Game {
             console.log("Player added:", sessionId, this.room!.sessionId);
             if (sessionId === this.room!.sessionId) {
                 this.roomCallBacks(player).onChange(() => {
-                    
+                    if (this.onHudUpdate) {
+                        const updates: Partial<HudState> = {};
+                        if (player.ammo !== undefined) updates.ammo = player.ammo;
+                        
+                        if (player.currentWeaponId !== undefined) {
+                            updates.weaponId = player.currentWeaponId;
+                            const weaponStats = this.allWeapons[player.currentWeaponId];
+                            if (weaponStats) {
+                                updates.maxAmmo = weaponStats.amunition;
+                            }
+                        }
+
+                        if (player.ammo !== undefined) this.player.ammo = player.ammo;
+                        if (player.reloadingWeapons !== undefined) this.player.reloadingWeapons = player.reloadingWeapons;
+                        if (player.health !== undefined) updates.health = player.health;
+
+                        if (Object.keys(updates).length > 0) {
+                            this.onHudUpdate(updates);
+                        }
+                    }
                     this.serverPosition = { x: player.x, y: player.y, dx: player.dx, dy: player.dy };
                     this.serverTick = player.lastInputTick || 0;
 
@@ -650,12 +675,29 @@ export class Game {
     }
 
     private handleMouseDown() {
+        const canShoot = () => {
+             const currentWeaponIdStr = this.player.playerWeaponId.toString();
+             const isReloading = this.player.reloadingWeapons?.get(currentWeaponIdStr);
+             if (isReloading || this.player.ammo <= 0) {
+                 return false;
+             }
+             return true;
+        };
+
+        if (!canShoot()) {
+            console.log("Cannot shoot: reloading or empty.");
+            return;
+        }
+        
         this.player.shoot(this.shootSound);
 
-        if (!this.shootingInterval) {
+        if (!this.shootingInterval) { 
             this.shootingInterval = setInterval(() => {
+                if (!canShoot()) {
+                    return; 
+                }
                 this.player.shoot(this.shootSound);
-            }, 100);
+            }, this.fireRate);
         }
     }
 
