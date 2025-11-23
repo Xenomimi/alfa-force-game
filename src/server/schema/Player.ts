@@ -31,11 +31,4 @@ export class Player extends Schema {
     this.health = health;
     this.name = name;
   }
-
-  // equipWeapon(weapon: any) {
-  //   this.currentWeaponId = weapon.weaponId;
-  //   this.damage = weapon.damage;
-  //   this.maxAmmo = weapon.ammo ?? 30;
-  //   this.currentAmmo = this.maxAmmo;
-  // }
 }

@@ -587,7 +587,7 @@ export class Game {
             // .drag()
             // .pinch()
             // .decelerate()
-            .wheel()
+            // .wheel()
             .clamp({ direction: 'all' })
             .clampZoom({ minWidth: 1920, minHeight: 1080, maxWidth: 3360, maxHeight: 2538 });
     }

@@ -21,6 +21,14 @@ interface GameHUDProps {
 
 const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => {
   const [showScore, setShowScore] = useState(false);
+  const ammoPercentage = hudState.maxAmmo > 0 
+      ? Math.min(100, Math.max(0, (hudState.ammo / hudState.maxAmmo) * 100)) 
+      : 0;
+
+    const healthPercentage = hudState.maxHealth > 0
+      ? Math.min(100, Math.max(0, (hudState.health / hudState.maxHealth) * 100))
+      : 0;
+
 
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
@@ -98,16 +106,35 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => 
           </div>
 
           <div className="hud-bars">
+            
+            {/* Pasek AMUNICJI */}
             <div className="hud-bar ammo">
-              <span className="hud-label">Amunicja</span>
-              {/* Dynamiczna amunicja */}
-              <span className="hud-value">{hudState.ammo} / {hudState.maxAmmo}</span>
+              <div className="hud-text-row">
+                <span className="hud-label">Amunicja</span>
+                <span className="hud-value">{hudState.ammo} / {hudState.maxAmmo}</span>
+              </div>
+              <div className="hud-progress-track">
+                <div 
+                  className="hud-progress-fill" 
+                  style={{ width: `${ammoPercentage}%` }}
+                />
+              </div>
             </div>
+
+            {/* Pasek ŻYCIA */}
             <div className="hud-bar health">
-              <span className="hud-label">Punkty życia</span>
-              {/* Dynamiczne życie */}
-              <span className="hud-value">{hudState.health} / {hudState.maxHealth}</span>
+              <div className="hud-text-row">
+                <span className="hud-label">Punkty życia</span>
+                <span className="hud-value">{Math.ceil(hudState.health)} / {hudState.maxHealth}</span>
+              </div>
+              <div className="hud-progress-track">
+                 <div 
+                  className="hud-progress-fill" 
+                  style={{ width: `${healthPercentage}%` }}
+                />
+              </div>
             </div>
+            
           </div>
         </div>
     </div>
