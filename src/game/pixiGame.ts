@@ -31,6 +31,10 @@ type PlayerSchema = {
     id: string;
     name: string;
     health: number;
+    maxHealth: number;
+    isAlive: boolean;
+    deaths: number;
+    kills: number;
     x: number;
     y: number;
     dx: number;
@@ -38,7 +42,6 @@ type PlayerSchema = {
     lastInputTick: number;
     currentWeaponId: number;
     ammo: number;
-    maxAmmo: number;
     reloadingWeapons: MapSchema<boolean>;
     input: PlayerInputSchema;
 };
@@ -101,15 +104,15 @@ export class Game {
             console.log("user_weapons received", this.userWeapons);
         });
 
-        this.room.onMessage("weapon_switched", (newWeaponId: number) => {
-            this.player.setGun(newWeaponId);
-            this.player.playerWeaponId = newWeaponId; 
-            this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
-            this.fireRate = this.allWeapons[newWeaponId]?.fireInterval;
-            if (this.onHudUpdate) {
-                this.onHudUpdate({ weaponId: newWeaponId });
-            }
-        });
+        // this.room.onMessage("weapon_switched", (newWeaponId: number) => {
+        //     this.player.setGun(newWeaponId);
+        //     this.player.playerWeaponId = newWeaponId; 
+        //     this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
+        //     this.fireRate = this.allWeapons[newWeaponId]?.fireInterval;
+        //     if (this.onHudUpdate) {
+        //         this.onHudUpdate({ weaponId: newWeaponId });
+        //     }
+        // });
         this.roomCallBacks = getStateCallbacks(this.room!);
 
         (async () => {
@@ -203,28 +206,50 @@ export class Game {
             entity.pivot.set(18, 70);
             this.testContainer.addChild(entity);
             console.log("Player added:", sessionId, this.room!.sessionId);
+            if (this.onHudUpdate) {
+                this.onHudUpdate({ 
+                    weaponId: player.currentWeaponId,
+                    kills: player.kills,
+                    deaths: player.deaths,
+                    ammo: player.ammo,
+                    maxAmmo: this.allWeapons[this.userWeapons[0]].amunition,
+                    health: player.maxHealth,
+                    maxHealth: player.maxHealth,
+                 });
+            }
             if (sessionId === this.room!.sessionId) {
+                this.player.playerName = player.name || "Anon";
+                this.player.drawPlayerName();
                 this.roomCallBacks(player).onChange(() => {
-                    if (this.onHudUpdate) {
-                        const updates: Partial<HudState> = {};
-                        if (player.ammo !== undefined) updates.ammo = player.ammo;
-                        
-                        if (player.currentWeaponId !== undefined) {
-                            updates.weaponId = player.currentWeaponId;
-                            const weaponStats = this.allWeapons[player.currentWeaponId];
-                            if (weaponStats) {
-                                updates.maxAmmo = weaponStats.amunition;
-                            }
-                        }
 
-                        if (player.ammo !== undefined) this.player.ammo = player.ammo;
-                        if (player.reloadingWeapons !== undefined) this.player.reloadingWeapons = player.reloadingWeapons;
-                        if (player.health !== undefined) updates.health = player.health;
+                    const updates: Partial<HudState> = {};
 
-                        if (Object.keys(updates).length > 0) {
-                            this.onHudUpdate(updates);
+                    if (player.currentWeaponId !== undefined && player.currentWeaponId !== this.player.playerWeaponId) {
+                        this.handleWeaponChange(player.currentWeaponId, updates);
+                    }
+                    if (player.ammo !== undefined) {
+                        this.player.ammo = player.ammo; // synchronizacja lokalna
+                        updates.ammo = player.ammo;  // do HUD
+                    }
+
+                    if (player.health !== undefined) updates.health = player.health;
+                    if (player.maxHealth !== undefined) updates.maxHealth = player.maxHealth;
+                    
+                    if (this.onHudUpdate && Object.keys(updates).length > 0) {
+                        this.onHudUpdate(updates);
+                    }
+                    if (player.isAlive !== undefined) {
+                        if (player.isAlive === false && this.player.isAlive) {
+                            this.player.isAlive = false;
+                            this.player.playerContainer.visible = false; // Ukryj gracza
+                            console.log("Player died...");
+                        } else if (player.isAlive === true && !this.player.isAlive) {
+                            this.player.isAlive = true;
+                            this.player.playerContainer.visible = true; // Pokaż gracza
+                            console.log("Respawning player...");
                         }
                     }
+                    if (player.reloadingWeapons !== undefined) this.player.reloadingWeapons = player.reloadingWeapons;
                     this.serverPosition = { x: player.x, y: player.y, dx: player.dx, dy: player.dy };
                     this.serverTick = player.lastInputTick || 0;
 
@@ -233,8 +258,9 @@ export class Game {
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
                 const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport, player.currentWeaponId);
+                newPlayer.playerName = player.name || "Anon";
+                newPlayer.drawPlayerName();
                 otherPlayers[sessionId] = newPlayer;
-                
                 newPlayer.positionBuffer = [];
                 // Synchronizuj jego pozycję z serwera
                 this.roomCallBacks(player).onChange(() => {
@@ -311,6 +337,23 @@ export class Game {
         this.roomCallBacks(this.room!.state).bulletEntities.onRemove((bullet: any, bulletId: string) => {
             console.log("Bullet removed:", bulletId);
         });
+    }
+
+    private handleWeaponChange(newWeaponId: number, updates: Partial<HudState>) {
+        // 1. Aktualizacja fizyczna/wizualna gracza
+        this.player.setGun(newWeaponId);
+        this.player.playerWeaponId = newWeaponId;
+        
+        // 2. Aktualizacja logiki strzelania (lokalnie)
+        this.currentWeaponIndex = this.userWeapons.indexOf(newWeaponId);
+        const weaponStats = this.allWeapons[newWeaponId];
+        
+        if (weaponStats) {
+            this.fireRate = weaponStats.fireInterval;
+            // 3. Przygotowanie danych do HUD
+            updates.weaponId = newWeaponId;
+            updates.maxAmmo = weaponStats.amunition;
+        }
     }
 
     private updateOtherPlayers() {
@@ -834,32 +877,11 @@ export class Game {
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const bullet = this.bullets[i];
             bullet.update();
-
-            // if (this.player.isAlive && bullet.checkCollision(this.player) && this.player.id !== bullet.playerId) {
-            //     this.handlePlayerHit(bullet.playerId);
-            //     bullet.destroy();
-            //     this.bullets.splice(i, 1);
-            //     continue;
-            // }
-
-            // for (let id in otherPlayers) {
-            //     const otherPlayer = otherPlayers[id];
-            //     if (otherPlayer.isAlive && bullet.checkCollision(otherPlayer)) {
-            //         socket.emit('player_hit', {
-            //             hitPlayerId: otherPlayer.id,
-            //             bulletPlayerId: bullet.playerId
-            //         });
-            //         bullet.destroy();
-            //         this.bullets.splice(i, 1);
-            //         break;
-            //     }
-            // }
-
-            // if (bullet.shouldRemove(3360, 2538)) {
-            //     bullet.destroy();
-            //     this.bullets.splice(i, 1);
-            // }
         }
+    }
+
+    handlePlayerDeath() {
+        
     }
 
     // handlePlayerHit(shooterId: string, damage: number = 10) {
@@ -877,36 +899,7 @@ export class Game {
     //     }
     // }
 
-    // handlePlayerDeath(killerId: string) {
-    //     this.player.deathTime = Date.now();
-    //     this.player.killerId = killerId;
 
-    //     socket.emit('player_death', {
-    //         playerId: this.player.id,
-    //         killerId: killerId,
-    //         deathTime: this.player.deathTime
-    //     });
-
-    //     setTimeout(() => {
-    //         const safePosition = this.findSafeRespawnPosition();
-    //         const respawnX = safePosition.x;
-    //         const respawnY = safePosition.y;
-
-    //         this.player.respawn(respawnX, respawnY);
-
-    //         socket.emit('player_respawn', {
-    //             playerId: this.player.id,
-    //             x: respawnX,
-    //             y: respawnY,
-    //             leftThighAngle: 0,
-    //             rightThighAngle: 0,
-    //             legPhase: 0,
-    //             headHitbox: { x: respawnX, y: respawnY },
-    //             torsoHitbox: { x: respawnX, y: respawnY + 12 },
-    //             legHitbox: { x: respawnX, y: respawnY + 12 + 37 - 12 }
-    //         });
-    //     }, 5000);
-    // }
 
     // findSafeRespawnPosition(): Point {
     //     const maxAttempts = 100;

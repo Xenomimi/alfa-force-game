@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../index";
 import * as dotenv from 'dotenv';
 import { verifyToken } from "../middleware/verifyToken";
+import { Stats } from "fs";
 const router = express.Router();
 
 dotenv.config()
@@ -104,7 +105,7 @@ router.get("/me", verifyToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: (req as any).userId },
-      include: { profile: true },
+      include: { profile: { include: { stats: true, inventory: { include: { weapon: true } } } } },
     });
 
     if (!user) return res.status(404).json({ loggedIn: false });

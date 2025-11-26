@@ -30,7 +30,7 @@ export class Player {
     width: number;
     height: number;
     bottom: number;
-    playerName: string = "";
+    playerName: string = "Anon";
     playerWeaponId: number;
     shootingPointOffsetX: number = 60;
     speed: number;
@@ -98,6 +98,7 @@ export class Player {
         this.playerWeaponId = playerWeaponId;
         this.globalBulletList = globalBulletList;
         this.gameRoom = gameRoom;
+
         this.viewport = viewport;
         // this.maxHealth = 100;
         // this.health = this.maxHealth;
@@ -130,7 +131,6 @@ export class Player {
 
         
         this.init(this.playerContainer);
-        this.drawPlayerName();
         this.parentContainer.addChild(this.playerContainer);
     }
 
@@ -236,9 +236,6 @@ export class Player {
         const slot = this._armature.getSlot('bone')!;
 
         try {
-            
-            
-            
             const tex: PIXI.Texture = PIXI.Assets.get(`weapon_${gunId}`);
             const newDisplay = new PIXI.Sprite(tex);
             

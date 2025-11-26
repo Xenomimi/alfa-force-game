@@ -5,11 +5,21 @@ import GameComponent from './Game/GameComponent.tsx';
 import '../styles/style.css';
 import { Client, Room } from 'colyseus.js';
 
+export interface PlayerStats {
+    health: number;
+    armor: number;
+    strength: number;
+    agility: number;
+    intelligence: number;
+    accuracy: number;
+}
+
 export interface UserProfile {
   level: number;
   experience: number;
   coins: number;
   cash: number;
+  stats: PlayerStats;
 }
 
 export interface User {

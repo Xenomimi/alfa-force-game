@@ -158,11 +158,15 @@ export class MyRoom extends Room<MyRoomState> {
                 mask: 0xFFFF ^ 0x0002 // koliduje ze wszystkimi oprócz graczy
             }
         });
+        (playerMatterBody as any).sessionId = client.sessionId;
         Matter.Composite.add(this.world, playerMatterBody);
         this.playerBodies.set(client.sessionId, playerMatterBody);
 
-        const playerState = new Player(client.sessionId, auth.profile.stats.health, client.auth.username);
-        playerState.id = client.sessionId;
+        const playerState = new Player(
+            client.sessionId, 
+            auth.profile.stats.health,
+            client.auth.username
+        );
 
         const userInventory = auth.profile.inventory || [];
         const userWeaponIds = userInventory.map((item) => item.weaponId);
@@ -251,18 +255,74 @@ export class MyRoom extends Room<MyRoomState> {
                 }
 
                 if (a.label === "bullet" && b.label === "player") {
-                    console.log("Hit player", b.id);
-                    (a as any).bulletRef.hasCollided = true;
+                    this.handleBulletHit(a, b);
                 }
                 if (b.label === "bullet" && a.label === "player") {
-                    console.log("Hit player", a.id);
-                    (b as any).bulletRef.hasCollided = true;
+                    this.handleBulletHit(b, a);
                 }
             }
         });
     }
 
-    
+    handleBulletHit(bulletBody: Matter.Body, playerBody: Matter.Body) {
+        const bullet = (bulletBody as any).bulletRef;
+        if (!bullet) return;
+
+        const bulletState = this.state.bulletEntities.get(bullet.id);
+        if (!bulletState) return;
+
+        const sessionId = (playerBody as any).sessionId;
+        const hitPlayer = this.state.playerEntities.get(sessionId);
+        if (!hitPlayer) return;
+
+        // --- POPRAWKA 1: Jeśli gracz już nie żyje, ignorujemy trafienie ---
+        if (!hitPlayer.isAlive) return; 
+
+        hitPlayer.health -= bulletState.damage;
+        console.log(`💥 Player ${hitPlayer.name} hit for ${bulletState.damage}. HP = ${hitPlayer.health}`);
+
+        if (hitPlayer.health <= 0) {
+            // --- POPRAWKA 2: Zabezpieczenie przed wielokrotnym wywołaniem śmierci ---
+            hitPlayer.health = 0; // Zerujemy dla porządku
+            this.handlePlayerDeath(hitPlayer, bulletState.playerId);
+        }
+
+        bullet.hasCollided = true;
+    }
+
+    handlePlayerDeath(player: Player, killerId: string) {
+        player.isAlive = false;
+        console.log(`☠️ Player died: ${player.name}`);
+        player.deaths += 1;
+
+        const killer = this.state.playerEntities.get(killerId);
+
+        if (killer && killer.id !== player.id) {
+            killer.kills += 1;
+        }
+
+        const body = this.playerBodies.get(player.id);
+        if (body) {
+            Matter.Body.setPosition(body, { x: -9999, y: -9999 });
+            Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        }
+
+        // RESPAWN
+        this.clock.setTimeout(() => {
+            // Pobieramy ciało ponownie (na wypadek gdyby coś się zmieniło)
+            const bodyRef = this.playerBodies.get(player.id);
+            // Sprawdź czy gracz nadal jest w pokoju (mógł wyjść w trakcie respawnu)
+            if (bodyRef && this.state.playerEntities.has(player.id)) {
+                Matter.Body.setPosition(bodyRef, { x: 800, y: 300 });
+                Matter.Body.setVelocity(bodyRef, { x: 0, y: 0 });
+                // Przywróć statystyki
+                player.health = player.maxHealth;
+                player.ammo = player.weaponMagazines.get(player.currentWeaponId)!;
+                player.isAlive = true; 
+                console.log(`🔄 Respawn player ${player.name}`);
+            }
+        }, 2000);
+    }
 
     updateEngine(deltaTime: number) {
         for (const [sessionId, body] of this.playerBodies.entries()) {
@@ -288,6 +348,19 @@ export class MyRoom extends Room<MyRoomState> {
                     velocity.y = this.jumpVelocity;
                 }
                 Matter.Body.setVelocity(body, velocity);
+            }
+        }
+        for (const [bulletId, bulletBody] of this.bulletBodies.entries()) {
+            const bulletState = this.state.bulletEntities.get(bulletId);
+            if (bulletState) {
+                bulletState.x = bulletBody.position.x;
+                bulletState.y = bulletBody.position.y;
+            }
+
+            if ((bulletBody as any).bulletRef.hasCollided) {
+                Matter.Composite.remove(this.world, bulletBody);
+                this.bulletBodies.delete(bulletId);
+                this.state.bulletEntities.delete(bulletId);
             }
         }
         Matter.Engine.update(this.physicsEngine, deltaTime);
@@ -327,21 +400,24 @@ export class MyRoom extends Room<MyRoomState> {
                 player.ammo -= 1;
                 player.weaponMagazines.set(player.currentWeaponId, player.ammo);
                 const bulletId = nanoid();
-                const bulletState = new Bullet();
-                bulletState.id = bulletId;
-                bulletState.playerId = player.id;
-                bulletState.x = data.x;
-                bulletState.y = data.y;
-                bulletState.aimAngle = data.angle;
-                // Obrażenia z zakresu broni
-                bulletState.damage = 
+                const bulletState = new Bullet(
+                    bulletId, 
+                    player.id, 
+                    data.x,
+                    data.y,
+                    data.angle,
                     Weapons[player.currentWeaponId].min_damage + 
-                    Math.floor(
-                        Math.random() * (
-                            Weapons[player.currentWeaponId].max_damage - Weapons[player.currentWeaponId].min_damage + 1
-                        )
-                    );
+                                        Math.floor(
+                                            Math.random() * (
+                                                Weapons[player.currentWeaponId].max_damage - Weapons[player.currentWeaponId].min_damage + 1
+                                            )
+                                        ),
+                    this.world
+                );
+
+                this.bulletBodies.set(bulletId, bulletState.bulletBody);
                 this.state.bulletEntities.set(bulletId, bulletState);
+
                 if (player.ammo <= 0) {
                     this.startReload(player, player.currentWeaponId);
                 }    
@@ -383,7 +459,7 @@ export class MyRoom extends Room<MyRoomState> {
                 this.startReload(player, newWeaponId);
             }
 
-            client.send("weapon_switched", newWeaponId);
+            // client.send("weapon_switched", newWeaponId);
         });
     }
 

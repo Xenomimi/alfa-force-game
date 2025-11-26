@@ -6,6 +6,8 @@ import { UserData } from '../App';
 
 export interface HudState {
     weaponId: number;
+    kills: number;
+    deaths: number;
     ammo: number;
     maxAmmo: number;
     health: number;
@@ -23,10 +25,12 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
     const pixiContainerRef = useRef<HTMLDivElement>(null);
     const [hudState, setHudState] = useState<HudState>({
         weaponId: 1,
-        ammo: 30,
-        maxAmmo: 30,
-        health: 100,
-        maxHealth: 100
+        kills: 0,
+        deaths: 0,
+        ammo: 0,
+        maxAmmo: 0,
+        health: 0,
+        maxHealth: 0
     });
 
     const handleGameExit = () => {
