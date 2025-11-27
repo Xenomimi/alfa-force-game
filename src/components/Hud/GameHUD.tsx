@@ -13,13 +13,23 @@ const mockScoreboard = [
   { id: 5, name: 'EnemyFive',  kills:  3, deaths:12,  ping:120 },
 ];
 
+export type ScoreboardEntry = {
+    id: string; // sessionId
+    name: string;
+    kills: number;
+    deaths: number;
+    ping: number;
+    isMe: boolean;
+};
+
 interface GameHUDProps {
   userData: UserData | null; 
   onGameExit: () => void;
   hudState: HudState;
+  scoreboardData: ScoreboardEntry[];
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState, scoreboardData }) => {
   const [showScore, setShowScore] = useState(false);
   const ammoPercentage = hudState.maxAmmo > 0 
       ? Math.min(100, Math.max(0, (hudState.ammo / hudState.maxAmmo) * 100)) 
@@ -53,7 +63,6 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => 
       {/* ►► SCOREBOARD ◄◄ */}
       {showScore && (
         <div className="scoreboard-overlay">
-          {/* korzystamy z dokładnie tych samych klas, co w LeadersScreen */}
           <div className="table-wrapper scoreboard-wrapper">
             <table className="leader-table">
               <thead>
@@ -65,28 +74,31 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState }) => 
                   <th>Ping</th>
                 </tr>
               </thead>
-
               <tbody>
-                {mockScoreboard.map((p, i) => (
+                {/* Używamy scoreboardData zamiast mockScoreboard */}
+                {scoreboardData.map((p, i) => (
                   <tr
                     key={p.id}
                     className={[
-                      p.me            ? 'current-user-row' : '',
+                      p.isMe          ? 'current-user-row' : '',
                       i < 3           ? 'top-row'          : '',
                     ].join(' ').trim()}
                   >
                     <td className="cell-rank">{i + 1}</td>
                     <td className="cell-player">
+                      {/* Avatar placeholder - można później zmienić na avatar z profilu */}
                       <img
-                        src="https://dummyimage.com/200x200/000/fff"
+                        src={`https://placehold.co/200x200/2C2F33/FFFFFF/png?text=${p.name.substring(0,2).toUpperCase()}`}
                         className={i === 0 ? 'img-first' : undefined}
                         alt=""                        
                       />
                       {p.name}
                     </td>
-                    <td className="cell-points">{p.kills}</td>
-                    <td className="cell-points">{p.deaths}</td>
-                    <td>{p.ping}</td>
+                    <td className="cell-points" style={{color: '#39FF14'}}>{p.kills}</td>
+                    <td className="cell-points" style={{color: '#E94560'}}>{p.deaths}</td>
+                    <td style={{color: p.ping < 50 ? '#39FF14' : p.ping < 100 ? 'orange' : 'red'}}>
+                        {p.ping} ms
+                    </td>
                   </tr>
                 ))}
               </tbody>

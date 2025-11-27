@@ -17,6 +17,7 @@ export class Player extends Schema {
   // Statystyki
   @type("number") deaths: number = 0;
   @type("number") kills: number = 0;
+  @type("number") ping: number = 0;
 
   // Pozycja i ruch
   @type("number") x: number = 0;

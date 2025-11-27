@@ -26,6 +26,10 @@ model PlayerProfile {
   experience    Int             @default(0)
   coins         Int             @default(0)
   cash          Int             @default(0)
+  totalKills    Int             @default(0)
+  totalDeaths   Int             @default(0)
+  createdAt     DateTime       @default(now())
+
   lastLogin     DateTime?
 
   stats         PlayerStats?

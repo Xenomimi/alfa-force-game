@@ -10,6 +10,7 @@ import mapData from "../assets/map_data.json";
 import { Weapon } from "../server/game/weapons";
 import { HudState } from '../components/Game/GameComponent';
 import { MapSchema } from '@colyseus/schema';
+import { ScoreboardEntry } from '../components/Hud/GameHUD';
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -84,9 +85,9 @@ export class Game {
     private currentWeaponIndex: number = 0;
     private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
-    private onHudUpdate?: (data: Partial<HudState>) => void;
+    private onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void;
 
-    constructor(containerElement: HTMLDivElement, room: Room<any>, onHudUpdate?: (data: Partial<HudState>) => void) {
+    constructor(containerElement: HTMLDivElement, room: Room<any>, onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void) {
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
         this.room = room;
@@ -140,6 +141,29 @@ export class Game {
             this.drawDebugBodies();
             this.setupFPSCounter();
         })();
+    }
+
+    private broadcastScoreboard() {
+        if (!this.onHudUpdate || !this.room) return;
+
+        const scoreboardData: ScoreboardEntry[] = [];
+        
+        this.room.state.playerEntities.forEach((player: any, sessionId: string) => {
+            scoreboardData.push({
+                id: sessionId,
+                name: player.name || "Unknown",
+                kills: player.kills,
+                deaths: player.deaths,
+                ping: player.ping || 0,
+                isMe: sessionId === this.room.sessionId
+            });
+        });
+
+        // Sortowanie po zabójstwach
+        scoreboardData.sort((a, b) => b.kills - a.kills);
+
+        // Wysyłamy puste updates dla HUD, ale pełny scoreboard
+        this.onHudUpdate({}, scoreboardData);
     }
 
     private addPlayer() {
@@ -205,7 +229,11 @@ export class Game {
             const entity = new PIXI.Graphics().rect(0, 0, 36, 140).fill({color: 0x0000ff });
             entity.pivot.set(18, 70);
             this.testContainer.addChild(entity);
+            
+            this.broadcastScoreboard();
+            
             console.log("Player added:", sessionId, this.room!.sessionId);
+
             if (this.onHudUpdate) {
                 this.onHudUpdate({ 
                     weaponId: player.currentWeaponId,
@@ -254,6 +282,7 @@ export class Game {
                     this.serverTick = player.lastInputTick || 0;
 
                 });
+                this.broadcastScoreboard();
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
@@ -265,7 +294,7 @@ export class Game {
                 // Synchronizuj jego pozycję z serwera
                 this.roomCallBacks(player).onChange(() => {
                     const other = otherPlayers[sessionId];
-
+                    this.broadcastScoreboard();
                     if (player.currentWeaponId !== undefined && other.playerWeaponId !== player.currentWeaponId) {
                         console.log(`Gracz ${sessionId} zmienia broń na: ${player.currentWeaponId}`);
                         other.playerWeaponId = player.currentWeaponId;
@@ -293,6 +322,7 @@ export class Game {
         });
 
         this.roomCallBacks(this.room!.state).playerEntities.onRemove((player: any, sessionId: string) => {
+            this.broadcastScoreboard();
             if (otherPlayers[sessionId]) {
                 // Usuń gracza z kontenera i świata fizyki
                 otherPlayers[sessionId].destroy();
@@ -335,6 +365,7 @@ export class Game {
         });
 
         this.roomCallBacks(this.room!.state).bulletEntities.onRemove((bullet: any, bulletId: string) => {
+            // Usuń pocisk z lokalnej tablicy i świata fizyki
             console.log("Bullet removed:", bulletId);
         });
     }

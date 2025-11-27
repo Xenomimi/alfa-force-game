@@ -59,6 +59,12 @@ type UserInfo = {
   } | null;
 };
 
+const REWARDS = {
+    KILL_XP: 50,
+    KILL_COINS: 10,
+    WIN_XP: 500
+};
+
 export class MyRoom extends Room<MyRoomState> {
     
     private collisionObjects = mapData.layers.find((layer: any) => layer.name === "Warstwa Obiektu 1")!.objects;
@@ -290,38 +296,70 @@ export class MyRoom extends Room<MyRoomState> {
         bullet.hasCollided = true;
     }
 
-    handlePlayerDeath(player: Player, killerId: string) {
+    async handlePlayerDeath(player: Player, killerId: string) {
+        if (!player.isAlive) return; // Zabezpieczenie
+        
         player.isAlive = false;
-        console.log(`☠️ Player died: ${player.name}`);
         player.deaths += 1;
+        
+        // 1. Logika Zabójcy (jeśli to nie samobójstwo)
+        if (killerId && killerId !== player.id) {
+            const killer = this.state.playerEntities.get(killerId);
+            if (killer) {
+                killer.kills += 1;
+                console.log(`🔫 Killer: ${killer.name} (+${REWARDS.KILL_XP} XP, +${REWARDS.KILL_COINS} Coins)`);
 
-        const killer = this.state.playerEntities.get(killerId);
-
-        if (killer && killer.id !== player.id) {
-            killer.kills += 1;
+                // Pobieramy klienta by mieć dostęp do auth data (jeśli trzymasz to w onJoin)
+                const killerClient = this.clients.find(c => c.sessionId === killer.id);
+                
+                if (killerClient && killerClient.auth) {
+                     prisma.playerProfile.update({
+                        where: { id: killerClient.auth.profile.id },
+                        data: {
+                            experience: { increment: REWARDS.KILL_XP },
+                            coins: { increment: REWARDS.KILL_COINS },
+                            totalKills: { increment: 1 }
+                        }
+                    }).catch(err => console.error("DB Save Error (Killer):", err));
+                }
+            }
         }
 
+        // 3. Zapisz śmierć ofiary w Bazie Danych
+        const victimClient = this.clients.find(c => c.sessionId === player.id);
+        if (victimClient && victimClient.auth) {
+             prisma.playerProfile.update({
+                where: { id: victimClient.auth.profile.id },
+                data: {
+                    totalDeaths: { increment: 1 }
+                }
+            }).catch(err => console.error("DB Save Error (Victim):", err));
+        }
+
+        // Fizyka: wyrzuć gracza poza mapę
         const body = this.playerBodies.get(player.id);
         if (body) {
             Matter.Body.setPosition(body, { x: -9999, y: -9999 });
             Matter.Body.setVelocity(body, { x: 0, y: 0 });
         }
 
-        // RESPAWN
+        // 4. RESPAWN po czasie
         this.clock.setTimeout(() => {
-            // Pobieramy ciało ponownie (na wypadek gdyby coś się zmieniło)
             const bodyRef = this.playerBodies.get(player.id);
-            // Sprawdź czy gracz nadal jest w pokoju (mógł wyjść w trakcie respawnu)
             if (bodyRef && this.state.playerEntities.has(player.id)) {
-                Matter.Body.setPosition(bodyRef, { x: 800, y: 300 });
+                // Tutaj warto dodać logikę bezpiecznego respawnu (losowe punkty na mapie)
+                Matter.Body.setPosition(bodyRef, { x: 800, y: 300 }); 
                 Matter.Body.setVelocity(bodyRef, { x: 0, y: 0 });
-                // Przywróć statystyki
+                
                 player.health = player.maxHealth;
-                player.ammo = player.weaponMagazines.get(player.currentWeaponId)!;
-                player.isAlive = true; 
-                console.log(`🔄 Respawn player ${player.name}`);
+                // Odnów amunicję w aktualnej broni
+                const currentMag = Weapons[player.currentWeaponId]?.amunition || 30;
+                player.weaponMagazines.set(player.currentWeaponId, currentMag);
+                player.ammo = currentMag;
+                
+                player.isAlive = true;
             }
-        }, 2000);
+        }, 3000); // 3 sekundy respawn
     }
 
     updateEngine(deltaTime: number) {

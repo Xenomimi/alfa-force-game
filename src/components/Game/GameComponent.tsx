@@ -3,6 +3,7 @@ import GameHUD from '../Hud/GameHUD.tsx';
 import { Game } from '../../game/pixiGame.ts';
 import { Room } from 'colyseus.js';
 import { UserData } from '../App';
+import { ScoreboardEntry } from '../Hud/GameHUD';
 
 export interface HudState {
     weaponId: number;
@@ -23,6 +24,7 @@ interface GameProps {
 const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) => { 
     const gameInstanceRef = useRef<Game | null>(null);
     const pixiContainerRef = useRef<HTMLDivElement>(null);
+    const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([]);
     const [hudState, setHudState] = useState<HudState>({
         weaponId: 1,
         kills: 0,
@@ -66,11 +68,15 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
             updateCanvasSize(container);
             window.addEventListener('resize', updateCanvasSize.bind(null, container));
 
-            const game = new Game(container, gameRoom, (updates: Partial<HudState>) => {
-                            setHudState(prevState => ({
-                                ...prevState,
-                                ...updates
-                            }));
+            const game = new Game(container, gameRoom, (updates: Partial<HudState>, newScoreboard: any) => {
+                            // Aktualizacja HUD (paski)
+                            if (Object.keys(updates).length > 0) {
+                                setHudState(prev => ({ ...prev, ...updates }));
+                            }
+                            // Aktualizacja Scoreboard (TAB)
+                            if (newScoreboard) {
+                                setScoreboard(newScoreboard);
+                            }
                         });
             gameInstanceRef.current = game;
 
@@ -87,7 +93,7 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
     return (    
         <div className="game-wrapper">
             <div id="pixiContainer" ref={pixiContainerRef}>
-                <GameHUD userData={userData} onGameExit={handleGameExit} hudState={hudState}/>
+                <GameHUD userData={userData} onGameExit={handleGameExit} hudState={hudState} scoreboardData={scoreboard}/>
             </div>
         </div>
     ) 
