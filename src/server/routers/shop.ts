@@ -92,4 +92,39 @@ router.post("/purchase", async (req, res) => {
   } 
 });
 
+router.post("sell", async (req, res) => {
+  try { 
+    const { userId, itemId } = req.body;
+    if (!userId || !itemId) {
+      return res.status(400).json({ error: "Brakuje danych" });
+    }
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+    if (!user || !user.profile) {
+      return res.status(404).json({ error: "Nie znaleziono użytkownika" });
+    }
+    const inventoryItem = await prisma.inventoryItem.findUnique({ where: { id: itemId, profileId: user.profile.id }, include: { weapon: true } });
+    if (!inventoryItem || !inventoryItem.weapon) {
+      return res.status(404).json({ error: "Nie znaleziono przedmiotu w ekwipunku" });
+    }
+    const sellPriceCoins = Math.floor(inventoryItem.weapon.priceCoins * 0.5);
+    const sellPriceCash = Math.floor(inventoryItem.weapon.priceCash * 0.5);
+    await prisma.$transaction([
+      prisma.playerProfile.update({
+        where: { id: user.profile.id },
+        data: {
+          coins: { increment: sellPriceCoins },
+          cash: { increment: sellPriceCash },
+        },
+      }),
+      prisma.inventoryItem.delete({
+        where: { id: inventoryItem.id },
+      }),
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Błąd przy sprzedaży przedmiotu:", err);
+    res.status(500).json({ error: "Błąd serwera przy sprzedaży przedmiotu" });
+  }
+});
+
 export default router;
