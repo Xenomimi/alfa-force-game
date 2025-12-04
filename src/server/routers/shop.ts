@@ -55,20 +55,36 @@ router.get("/artifacts", async (req, res) => {
 router.post("/purchase", async (req, res) => {
   try { 
     const { userId, itemId } = req.body;
+    
     if (!userId || !itemId) {
       return res.status(400).json({ error: "Brakuje danych" });
     }
+
     const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
     if (!user || !user.profile) {
       return res.status(404).json({ error: "Nie znaleziono użytkownika" });
     }
+
     const weapon = await prisma.weapon.findUnique({ where: { id: itemId } });
     if (!weapon) {
       return res.status(404).json({ error: "Nie znaleziono przedmiotu" });
     }
+
+    const existingItem = await prisma.inventoryItem.findFirst({
+      where: {
+        profileId: user.profile.id,
+        weaponId: weapon.id
+      }
+    });
+
+    if (existingItem) {
+      return res.status(400).json({ error: "Już posiadasz ten przedmiot" });
+    }
+
     if (user.profile.coins < weapon.priceCoins || user.profile.cash < weapon.priceCash) {
       return res.status(400).json({ error: "Niewystarczające środki" });
     }
+
     await prisma.$transaction([
       prisma.playerProfile.update({
         where: { id: user.profile.id },
@@ -85,7 +101,9 @@ router.post("/purchase", async (req, res) => {
         },
       }),
     ]);
+
     res.json({ success: true });
+
   } catch (err) {
     console.error("Błąd przy zakupie przedmiotu:", err);
     res.status(500).json({ error: "Błąd serwera przy zakupie przedmiotu" });
@@ -93,21 +111,55 @@ router.post("/purchase", async (req, res) => {
 });
 
 router.post("/sell", async (req, res) => {
-  try { 
+  try {
+    // itemId tutaj to ID rodzaju broni (np. 1 dla "Pistolet startowy"), a nie ID z inventory
     const { userId, itemId } = req.body;
+
     if (!userId || !itemId) {
       return res.status(400).json({ error: "Brakuje danych" });
     }
-    const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+
+    // 1. Znajdź użytkownika i jego profil
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true }
+    });
+
     if (!user || !user.profile) {
       return res.status(404).json({ error: "Nie znaleziono użytkownika" });
     }
-    const inventoryItem = await prisma.inventoryItem.findUnique({ where: { id: itemId, profileId: user.profile.id }, include: { weapon: true } });
-    if (!inventoryItem || !inventoryItem.weapon) {
-      return res.status(404).json({ error: "Nie znaleziono przedmiotu w ekwipunku" });
+
+    // Sprawdź, czy gracz ma więcej niż 1 broń (wymóg biznesowy)
+    const weaponCount = await prisma.inventoryItem.count({
+      where: {
+        profileId: user.profile.id
+      }
+    });
+
+    if (weaponCount <= 1) {
+      return res.status(400).json({ error: "Nie możesz sprzedać ostatniej broni!" });
     }
+
+    // 2. Znajdź KONKRETNY przedmiot w ekwipunku na podstawie ID broni
+    const inventoryItem = await prisma.inventoryItem.findFirst({
+      where: {
+        profileId: user.profile.id,
+        weaponId: itemId
+      },
+      include: {
+        weapon: true // Pobieramy info o broni, żeby znać jej cenę
+      }
+    });
+
+    if (!inventoryItem) {
+      return res.status(404).json({ error: "Nie posiadasz tego przedmiotu" });
+    }
+
+    // Oblicz cenę sprzedaży (50%)
     const sellPriceCoins = Math.floor(inventoryItem.weapon.priceCoins * 0.5);
     const sellPriceCash = Math.floor(inventoryItem.weapon.priceCash * 0.5);
+
+    // 4. Transakcja: Dodaj hajs i usuń ten konkretny znaleziony przedmiot
     await prisma.$transaction([
       prisma.playerProfile.update({
         where: { id: user.profile.id },
@@ -120,7 +172,9 @@ router.post("/sell", async (req, res) => {
         where: { id: inventoryItem.id },
       }),
     ]);
+
     res.json({ success: true });
+
   } catch (err) {
     console.error("Błąd przy sprzedaży przedmiotu:", err);
     res.status(500).json({ error: "Błąd serwera przy sprzedaży przedmiotu" });

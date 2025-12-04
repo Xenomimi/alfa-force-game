@@ -51,3 +51,91 @@
 .buy-btn:hover{
   background:var(--accent-green-hover);
 }
+
+/* ---------- MODAL POTWIERDZENIA  ------------ */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: var(--bg-dark-secondary);
+  border: 1px solid var(--border-color);
+  padding: 24px;
+  border-radius: 8px;
+  width: 400px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  font-family: var(--font);
+  color: var(--text-primary);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: var(--accent-blue-header);
+  text-transform: uppercase;
+}
+
+.modal-item-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin: 10px 0;
+}
+
+.modal-cost {
+  margin: 15px 0;
+  font-size: 16px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.btn-cancel, .btn-confirm {
+  padding: 10px 24px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: 0.2s;
+}
+
+.btn-cancel {
+  background: var(--bg-dark-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+.btn-cancel:hover {
+  background: #3c4045;
+  color: #fff;
+}
+
+.btn-confirm {
+  background: var(--accent-green);
+  color: #000;
+}
+.btn-confirm:hover {
+  background: var(--accent-green-hover);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}

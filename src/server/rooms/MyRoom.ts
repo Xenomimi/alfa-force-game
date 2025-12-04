@@ -492,6 +492,8 @@ export class MyRoom extends Room<MyRoomState> {
             }
             player.ammo = savedAmmo;
 
+            console.log(`🔄 Player ${player.name} switched weapon to ID: ${newWeaponId} (Ammo: ${player.ammo})`);
+
             // Jeśli wyciągnęliśmy pustą broń, która się NIE ładuje -> ładuj
             if (player.ammo <= 0 && !player.reloadingWeapons.get(newWeaponId.toString())) {
                 this.startReload(player, newWeaponId);

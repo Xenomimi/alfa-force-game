@@ -117,7 +117,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame
       {activeSection === 'profil' ? (
         <PlayerProfile userData={userData} />
       ) : activeSection === 'sklep' ? (
-        <ShopScreen />
+        <ShopScreen userData={userData} />
       ) : activeSection === 'liderzy' ? (
         <LeadersScreen userData={userData}/>
       ) : activeSection === 'ustawienia' ? (

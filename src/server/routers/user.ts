@@ -6,7 +6,54 @@ import { verifyToken } from "../middleware/verifyToken";
 
 const router = express.Router();
 
-router.get("/playerstats", async (req, res) => {
+router.get("/inventory", verifyToken, async (req, res) => {
+    try {
+        const userId = (req as any).userId;
+        
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                profile: {
+                    include: {
+                        inventory: {
+                            include: { weapon: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!user || !user.profile) {
+            return res.status(404).json({ error: "Nie znaleziono profilu użytkownika" });
+        }
+
+        // Mapujemy dane z bazy na format oczekiwany przez frontend (Item)
+        const inventory = user.profile.inventory.map(item => ({
+            id: item.weapon.id, // ID definicji broni (potrzebne do sprzedaży/wyświetlania)
+            name: item.weapon.name,
+            description: item.weapon.description,
+            category: item.weapon.category,
+            priceCoins: item.weapon.priceCoins,
+            priceCash: item.weapon.priceCash,
+            stats: {
+                min_damage: item.weapon.min_damage,
+                max_damage: item.weapon.max_damage,
+                amunition: item.weapon.amunition,
+                reloadTime: item.weapon.reloadTime,
+                fireInterval: item.weapon.fireInterval,
+                accuracy: item.weapon.accuracy
+            }
+        }));
+
+        res.json(inventory);
+
+    } catch (err) {
+        console.error("Błąd przy pobieraniu ekwipunku:", err);
+        res.status(500).json({ error: "Błąd serwera" });
+    }
+});
+
+router.get("/playerstats", verifyToken, async (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ loggedIn: false });
     try {

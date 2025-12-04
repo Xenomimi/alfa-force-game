@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import '../Shop/css/ShopScreen.css';
 import '../Profile/css/PlayerProfile.css';
+import { UserData } from '../App.tsx';
 
 type Tab = 'bronie' | 'artefakty';
 type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
@@ -20,6 +21,10 @@ interface Item<T = WeaponStats | ArtifactStats> {
   category?: string;
 }
 
+interface PlayerProfileProps {
+  userData: UserData | null;
+}
+
 const CATEGORIES = [
   { key:'smg',   label:'Pistolety maszynowe', icon:<Swords size={18}/> },
   { key:'rifle', label:'Karabiny',            icon:<Swords size={18}/> },
@@ -27,11 +32,14 @@ const CATEGORIES = [
   { key:'melee', label:'Broń biała',          icon:<Swords size={18}/> },
 ];
 
-const ShopScreen: React.FC = () => {
+const ShopScreen: React.FC<PlayerProfileProps> = ({ userData }) => {
   const [tab,setTab] = useState<Tab>('bronie');
   const [category,setCategory] = useState('smg');
   const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
   const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
+  // Stan dla Modala Potwierdzenia
+  const [confirmItem, setConfirmItem] = useState<Item | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
  
   useEffect(() => {
     const populateShop = async () => {
@@ -91,6 +99,58 @@ const ShopScreen: React.FC = () => {
     );
   };
 
+  // --- LOGIKA KUPOWANIA ---
+
+  const handleBuyClick = (item: Item) => {
+      // 1. Sprawdź czy użytkownik ma środki (walidacja frontend)
+      if (!userData) return;
+      
+      const canAffordCoins = userData.user.profile.coins >= item.priceCoins;
+      const canAffordCash = userData.user.profile.cash >= item.priceCash;
+
+      if (!canAffordCoins || !canAffordCash) {
+          alert("Nie masz wystarczająco środków!");
+          return;
+      }
+
+      // 2. Otwórz modal
+      setConfirmItem(item);
+  };
+
+  const confirmPurchase = async () => {
+      if (!confirmItem || !userData || isProcessing) return;
+      setIsProcessing(true);
+
+      try {
+          const res = await fetch("http://localhost:4000/shop/purchase", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                  userId: userData.user.id,
+                  itemId: confirmItem.id
+              })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+              throw new Error(data.error || "Błąd zakupu");
+          }
+
+          if (data.success) {
+              alert(`Kupiono: ${confirmItem.name}! (Odśwież stronę by zaktualizować stan konta)`);
+              setConfirmItem(null);
+              // Tutaj idealnie byłoby wywołać funkcję odświeżającą userData w App.tsx
+          }
+      } catch (err: any) {
+          console.error(err);
+          alert("Błąd: " + err.message);
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
   return(
     <div className="profile-root">     
       <aside className="profile-left">
@@ -140,7 +200,7 @@ const ShopScreen: React.FC = () => {
                   <Coins size={14} color="#f79824" /> {it.priceCoins}
                   <DollarSign size={14} color="#39FF14"/> {it.priceCash}
                 </div>
-                <button className="buy-btn">
+                <button className="buy-btn" onClick={() => handleBuyClick(it)}>
                   <PackageCheck size={14}/> Kup
                 </button>
               </div>
@@ -148,6 +208,35 @@ const ShopScreen: React.FC = () => {
           ))}
         </div>
       </section>
+      {/* MODAL POTWIERDZENIA */}
+      {confirmItem && (
+          <div className="modal-overlay">
+              <div className="modal-content">
+                  <h3>Potwierdzenie zakupu</h3>
+                  <div className="item-thumb" style={{background: 'var(--bg-dark-tertiary)', marginTop: 10}}>
+                      <img src={`/weapons/${confirmItem.id}.png`} alt="" style={{height: 80}}/>
+                  </div>
+                  <div className="modal-item-name">{confirmItem.name}</div>
+                  
+                  <div className="modal-cost">
+                      <span>Koszt:</span> 
+                      <div className="sell-price-row" style={{display: 'flex', justifyContent: 'center', gap: 10, color: '#e74c3c', fontWeight: 'bold', fontSize: 18, marginTop: 5}}>
+                        <div style={{display:'flex', alignItems:'center'}}><Coins size={18} color="#f79824" /> -{confirmItem.priceCoins}</div>
+                        <div style={{display:'flex', alignItems:'center'}}><DollarSign size={18} color="#39FF14" /> -{confirmItem.priceCash}</div>
+                      </div>
+                  </div>
+
+                  <p style={{fontSize: 13, color: '#aaa'}}>Czy na pewno chcesz zakupić ten przedmiot?</p>
+
+                  <div className="modal-actions">
+                      <button className="btn-cancel" onClick={() => setConfirmItem(null)}>Anuluj</button>
+                      <button className="btn-confirm" onClick={confirmPurchase} disabled={isProcessing}>
+                          {isProcessing ? "Przetwarzanie..." : "Potwierdź zakup"}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

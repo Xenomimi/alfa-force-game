@@ -75,6 +75,9 @@ export class Game {
     private shootSound!: HTMLAudioElement;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
+    private boundHandleMouseDown: (event: PointerEvent) => void;
+    private boundHandleMouseUp: (event: PointerEvent) => void;
+    private boundHandleMouseWheel: (event: WheelEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
     private fireRate: number = 1000; // domyślny czas między strzałami
     private inputSequence: number = 0;
@@ -90,6 +93,9 @@ export class Game {
     constructor(containerElement: HTMLDivElement, room: Room<any>, onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void) {
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
+        this.boundHandleMouseDown = this.handleMouseDown.bind(this);
+        this.boundHandleMouseUp = this.handleMouseUp.bind(this);
+        this.boundHandleMouseWheel = this.handleMouseWheel.bind(this);
         this.room = room;
         this.onHudUpdate = onHudUpdate;
         this.room.onMessage("all_available_weapons", (weapons: Record<number, Weapon>) => {
@@ -808,9 +814,9 @@ export class Game {
     setupEventListeners() {
         document.addEventListener('keydown', this.boundHandleKeyDown);
         document.addEventListener('keyup', this.boundHandleKeyUp);
-        document.addEventListener('pointerdown', this.handleMouseDown.bind(this));
-        document.addEventListener('pointerup', this.handleMouseUp.bind(this));
-        document.addEventListener('wheel', this.handleMouseWheel.bind(this));
+        document.addEventListener('pointerdown', this.boundHandleMouseDown);
+        document.addEventListener('pointerup', this.boundHandleMouseUp);
+        document.addEventListener('wheel', this.boundHandleMouseWheel);     
     }
 
     private handleKeyDown(event: KeyboardEvent) {
@@ -840,8 +846,9 @@ export class Game {
     removeEventListeners() {
         document.removeEventListener('keydown', this.boundHandleKeyDown);
         document.removeEventListener('keyup', this.boundHandleKeyUp);
-        document.removeEventListener('pointerdown', this.handleMouseDown.bind(this));
-        document.removeEventListener('pointerup', this.handleMouseUp.bind(this));
+        document.removeEventListener('pointerdown', this.boundHandleMouseDown);
+        document.removeEventListener('pointerup', this.boundHandleMouseUp);
+        document.removeEventListener('wheel', this.boundHandleMouseWheel);
         if (this.shootingInterval) {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;
