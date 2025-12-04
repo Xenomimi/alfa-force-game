@@ -92,7 +92,7 @@ router.post("/purchase", async (req, res) => {
   } 
 });
 
-router.post("sell", async (req, res) => {
+router.post("/sell", async (req, res) => {
   try { 
     const { userId, itemId } = req.body;
     if (!userId || !itemId) {

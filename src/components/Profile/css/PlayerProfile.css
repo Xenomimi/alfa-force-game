@@ -43,7 +43,6 @@
 
 .player-card .player-name{
   margin:0 0 8px;
-  font-size:18px;
   font-weight:600;
 }
 
@@ -55,7 +54,7 @@
 .stats-mini strong{color:var(--accent-green);margin-left:6px;}
 
 .big-placeholder{
-  margin-top:14px;height:110px;
+  margin-top:14px;
   width: 100%;
   border-radius:4px;
   display:flex;align-items:center;justify-content:center;

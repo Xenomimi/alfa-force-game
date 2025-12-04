@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Save,
-  Shield, PackageCheck, Swords, Gem, Coins, DollarSign
+  Shield, PackageCheck, Swords, Gem, Coins, DollarSign,
+  Baseline
 } from 'lucide-react';
 import './css/PlayerProfile.css';
 import { UserData } from '../App.tsx';
+import { info } from 'console';
 
 type Tab = 'bronie' | 'artefakty';
 type WeaponStats   = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number};
@@ -25,11 +27,28 @@ interface PlayerProfileProps {
   userData: UserData | null;
 }
 
+interface PlayerInfo {
+  username: string;
+  profile: {
+    id: number;
+    userId: number;
+    level: number;
+    experience: number;
+    coins: number;
+    cash: number;
+    totalKills: number;
+    totalDeaths: number;
+    createdAt: string;
+    lastLogin?: number;
+  }
+}
+
 const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   const [tab, setTab] = useState<Tab>('bronie');
   const [weapons, setWeapons] = useState<Item<WeaponStats>[]>([]);
   const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({ health: -1, armor: -1, strength: -1, agility: -1, intelligence: -1, accuracy: -1 });
+  const [userInfo, setUserInfo] = useState<PlayerInfo>({ username: '', profile: { id: -1, userId: -1, level: -1, experience: -1, coins: -1, cash: -1, totalKills: -1, totalDeaths: -1, createdAt: '', lastLogin: -1 } });
   // const userStats: UserStats = {}; 
   if (!userData) {
     return <div>Ładowanie profilu...</div>;
@@ -38,23 +57,28 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   useEffect(() => {
     const populateData = async () => {
         try {
-            const [weaponsRes, artifactsRes, statsRes] = await Promise.all([
+            const [weaponsRes, artifactsRes, statsRes, infoRes] = await Promise.all([
               fetch("http://localhost:4000/shop/weapons", { credentials: "include" }),
               fetch("http://localhost:4000/shop/artifacts", { credentials: "include" }),
               fetch("http://localhost:4000/user/playerstats", { credentials: "include" }),
+              fetch("http://localhost:4000/user/playerinfo", { credentials: "include" })
             ]);
-            if (!weaponsRes.ok || !artifactsRes.ok || !statsRes.ok) {
+            if (!weaponsRes.ok || !artifactsRes.ok || !statsRes.ok || !infoRes.ok) {
               throw new Error("Błąd przy pobieraniu danych");
             }
-            const [weaponsData, artifactsData, statsData] = await Promise.all([
+            const [weaponsData, artifactsData, statsData, infoData] = await Promise.all([
               weaponsRes.json(),
               artifactsRes.json(),
               statsRes.json(),
+              infoRes.json()
             ]);
 
             setWeapons(weaponsData);
             setArtifacts(artifactsData);
             setUserStats(statsData);
+            setUserInfo(infoData);
+
+            console.dir(infoData);
         } catch (err) {
             console.error("Błąd przy pobieraniu danych w PlayerProfile", err);
         }
@@ -63,19 +87,19 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
     populateData();
   }, []);
 
-    const renderPlayerStats = (it: UserStats) =>{
-      const s = it;
-      return(
-          <>
-            <span>Health:</span><span>{s.health}</span>
-            <span>Armor:</span><span>{s.armor}</span>
-            <span>Strength:</span><span>{s.strength}</span>
-            <span>Agility:</span><span>{s.agility}</span>
-            <span>Intelligence:</span><span>{s.intelligence}</span>
-            <span>Accuracy:</span><span>{s.accuracy}</span>
-          </>
-      );
-  };  
+  const renderPlayerStats = (it: UserStats) =>{
+    const s = it;
+    return(
+        <>
+          <span>Health:</span><span>{s.health}</span>
+          <span>Armor:</span><span>{s.armor}</span>
+          <span>Strength:</span><span>{s.strength}</span>
+          <span>Agility:</span><span>{s.agility}</span>
+          <span>Intelligence:</span><span>{s.intelligence}</span>
+          <span>Accuracy:</span><span>{s.accuracy}</span>
+        </>
+    );
+  }; 
 
   const list = tab==='bronie' ? weapons : artifacts;
   const renderWeaponStats = (it:Item) =>{
@@ -107,9 +131,14 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
           <div className="avatar">
             <img src="https://dummyimage.com/100x100/000/fff" alt="Avatar gracza"/>
           </div>
-          <h3 className="player-name">  
+          <h1 className="player-name">  
             {userData.user.username}
-          </h3>
+                        <div>
+              <span style={{fontSize: '13px', color: '#fff', background: '#2C2F33', padding: '2px 6px', borderRadius: 4}}>
+                KDR: {userInfo.profile.totalDeaths > 0 ? (userInfo.profile.totalKills / userInfo.profile.totalDeaths).toFixed(2) : userInfo.profile.totalKills.toFixed(2)}
+              </span>
+            </div>
+          </h1>
           <div className="stats-mini">
             <div><span>Poziom</span><strong>{userData?.user.profile.level}</strong></div>
             <div><span>Osiągnięcia</span><strong>{userData?.user.profile.experience}</strong></div>
@@ -118,6 +147,15 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
           <div className="big-placeholder">
               <div className="item-stats">
                 <div className="stats-grid">{renderPlayerStats(userStats)}</div>
+              </div>
+          </div>
+          <div className="">
+            <h4>Statystyki postaci</h4>
+          </div>
+          <div className="big-placeholder">
+              <div className="stats-grid">
+                <span>Total kills:</span><span>{userInfo.profile.totalKills}</span>
+                <span>Total deaths:</span><span>{userInfo.profile.totalKills}</span>
               </div>
           </div>
         </section>
