@@ -4,7 +4,8 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../index";
 import * as dotenv from 'dotenv';
 import { verifyToken } from "../middleware/verifyToken";
-import { Stats } from "fs";
+import { LevelSystem } from "../game/levelSystem";
+
 const router = express.Router();
 
 dotenv.config()
@@ -62,7 +63,17 @@ router.post("/register", async (req, res) => {
           },
     });
 
-    return res.json({ success: true, user });
+    const nextLevelXP = LevelSystem.getMaxXPForLevel(user.profile?.level || 1);
+    const levelProgress = 0;
+
+    return res.json({ 
+        success: true, 
+        user: {
+            ...user,
+            nextLevelXP,
+            levelProgress
+        } 
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Błąd serwera" });
@@ -108,13 +119,29 @@ router.get("/me", verifyToken, async (req, res) => {
       include: { profile: { include: { stats: true, inventory: { include: { weapon: true } } } } },
     });
 
-    if (!user) return res.status(404).json({ loggedIn: false });
-    res.json({ loggedIn: true, user, token: req.cookies.token });
-  } catch {
+    if (!user || !user.profile) return res.status(404).json({ loggedIn: false });
+
+    // --- FIX START: To jest kluczowe miejsce ---
+    // Obliczamy ile XP potrzeba na obecnym poziomie i jaki jest postęp
+    const nextLevelXP = LevelSystem.getMaxXPForLevel(user.profile.level);
+    const levelProgress = LevelSystem.getProgressPercent(user.profile.level, user.profile.experience);
+
+    res.json({ 
+        loggedIn: true, 
+        user: {
+            ...user,
+            // Doklejamy obliczone pola, których React oczekuje w "extraData"
+            nextLevelXP: nextLevelXP,     
+            levelProgress: levelProgress 
+        },
+        token: req.cookies.token 
+    });
+    // --- FIX END ---
+
+  } catch (e) {
+    console.error(e); // Warto dodać logowanie błędu
     res.status(401).json({ loggedIn: false });
   }
 });
-
-
 
 export default router;
