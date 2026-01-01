@@ -3,7 +3,7 @@ import { prisma } from "../index";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "./auth";
 import { verifyToken } from "../middleware/verifyToken";
-
+import { LevelSystem } from "../game/levelSystem";
 const router = express.Router();
 
 router.get("/inventory", verifyToken, async (req, res) => {
@@ -74,11 +74,21 @@ router.get("/playerinfo", verifyToken, async (req, res) => {
             where: { id: (req as any).userId },
             include: { profile: true },
         });
-        if (!user) return res.status(404).json({ user: false });
-        res.json({ username: user.username, profile: user.profile });
+        if (!user || !user.profile) return res.status(404).json({ user: false });
+
+        // Używamy metody z klasy LevelSystem - kod jest czysty i spójny
+        const progress = LevelSystem.getProgressPercent(user.profile.level, user.profile.experience);
+        const maxXP = LevelSystem.getMaxXPForLevel(user.profile.level);
+
+        res.json({ 
+            username: user.username, 
+            profile: user.profile,
+            levelProgress: progress, // Gotowe np. 45
+            nextLevelXP: maxXP,      // Ile potrzeba łącznie na ten level (np. 200)
+            currentXP: user.profile.experience // Ile gracz ma obecnie (np. 90)
+        });
     } catch (err) {
-        console.error("Błąd przy pobieraniu informacji o użytkowniku:", err);
-        res.status(500).json({ error: "Błąd serwera przy pobieraniu informacji o użytkowniku" });
+       throw err;
     }
 });
 

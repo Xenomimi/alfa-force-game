@@ -11,6 +11,7 @@ import { Weapon } from "../server/game/weapons";
 import { HudState } from '../components/Game/GameComponent';
 import { MapSchema } from '@colyseus/schema';
 import { ScoreboardEntry } from '../components/Hud/GameHUD';
+import { LevelSystem } from "../server/game/levelSystem";
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -110,6 +111,39 @@ export class Game {
             }
             console.log("user_weapons received", this.userWeapons);
         });
+        this.room.onMessage("player_stats_update", (data: any) => {
+            console.log("Otrzymano nagrodę:", data);
+
+            // NOWA LOGIKA:
+            // Obliczamy postęp na podstawie danych z serwera.
+            // data.experience = obecne XP w pasku (np. 50)
+            // data.nextLevelXP = wymagane XP na poziom (np. 1000)
+            
+            const maxXP = data.nextLevelXP || 1; // Zabezpieczenie przed dzieleniem przez 0
+            const currentXP = data.experience || 0;
+            
+            // Proste obliczenie procentu (0-100)
+            let calculatedProgress = (currentXP / maxXP) * 100;
+            
+            // Ograniczenie do zakresu 0-100 (dla bezpieczeństwa UI)
+            calculatedProgress = Math.min(100, Math.max(0, calculatedProgress));
+
+            if (this.onHudUpdate) {
+                const updates: Partial<HudState> = {
+                    level: data.level,
+                    experience: currentXP,
+                    nextLevelXP: maxXP,
+                    levelProgress: calculatedProgress, // Przekazujemy obliczony %
+                    addedXP: data.addedXP,
+                    addedCoins: data.addedCoins
+                };
+
+                if (data.coins !== undefined) updates.coins = data.coins;
+                if (data.cash !== undefined) updates.cash = data.cash;
+
+                this.onHudUpdate(updates);
+            }
+        });
 
         // this.room.onMessage("weapon_switched", (newWeaponId: number) => {
         //     this.player.setGun(newWeaponId);
@@ -144,7 +178,7 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            this.drawDebugBodies();
+            // this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }

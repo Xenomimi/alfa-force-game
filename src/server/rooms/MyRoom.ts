@@ -9,7 +9,7 @@ import { JWT } from "@colyseus/auth"
 import { JWT_SECRET } from "../routers/auth";
 import { prisma } from "../index";
 import { Weapons } from "../game/weapons";
-
+import { LevelSystem } from "../game/levelSystem";
 
 type Point = {
     x: number;
@@ -313,18 +313,53 @@ export class MyRoom extends Room<MyRoomState> {
                 const killerClient = this.clients.find(c => c.sessionId === killer.id);
                 
                 if (killerClient && killerClient.auth) {
-                     prisma.playerProfile.update({
-                        where: { id: killerClient.auth.profile.id },
-                        data: {
-                            experience: { increment: REWARDS.KILL_XP },
-                            coins: { increment: REWARDS.KILL_COINS },
-                            totalKills: { increment: 1 }
+                    // 1. Pobieramy aktualne dane z bazy, aby wiedzieć ile mamy XP
+                    const currentProfile = await prisma.playerProfile.findUnique({
+                        where: { id: killerClient.auth.profile.id }
+                    });
+                    if (currentProfile) {
+                        // 1. Obliczamy nowy stan używając metody systemowej
+                        const result = LevelSystem.calculateNewState(
+                            currentProfile.level,
+                            currentProfile.experience, 
+                            REWARDS.KILL_XP
+                        );
+                        
+                        const newTotalCoins = currentProfile.coins + REWARDS.KILL_COINS;
+
+                        // 2. Wysyłamy do klienta zaktualizowane dane
+                        killerClient.send("player_stats_update", {
+                            level: result.newLevel,
+                            experience: result.newXP,           // Wysyłamy zresetowaną wartość (np. 15)
+                            nextLevelXP: result.xpForNextLevel, // Maksimum paska (np. 200)
+                            coins: newTotalCoins,
+                            cash: currentProfile.cash,
+                            addedXP: REWARDS.KILL_XP,
+                            addedCoins: REWARDS.KILL_COINS
+                        });
+
+                        // 3. Zapisujemy do bazy
+                        await prisma.playerProfile.update({
+                            where: { id: currentProfile.id },
+                            data: {
+                                experience: result.newXP,  // WAŻNE: Zapisujemy resztę, a nie sumę!
+                                level: result.newLevel,
+                                coins: newTotalCoins,
+                                totalKills: { increment: 1 }
+                            }
+                        }).catch(err => console.error("DB Save Error (Killer):", err));
+
+                        console.log(`🔫 Killer: ${killer.name}. Lvl: ${currentProfile.level} -> ${result.newLevel}. XP: ${result.newXP}/${result.xpForNextLevel}`);
+
+                        // 4. Obsługa awansu
+                        if (result.leveledUp) {
+                            killerClient.send("level_up", { newLevel: result.newLevel });
                         }
-                    }).catch(err => console.error("DB Save Error (Killer):", err));
+                    }
                 }
             }
         }
-
+    
         // 3. Zapisz śmierć ofiary w Bazie Danych
         const victimClient = this.clients.find(c => c.sessionId === player.id);
         if (victimClient && victimClient.auth) {
@@ -359,7 +394,7 @@ export class MyRoom extends Room<MyRoomState> {
                 
                 player.isAlive = true;
             }
-        }, 3000); // 3 sekundy respawn
+        }, 3000);
     }
 
     updateEngine(deltaTime: number) {

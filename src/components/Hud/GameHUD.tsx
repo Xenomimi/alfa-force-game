@@ -58,7 +58,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState, score
   return (
     <div className="game-hud-container">
       {/* górny pasek */}
-      <LobbyHeader userData={userData} onLogout={onGameExit} />
+      <LobbyHeader userData={userData} hudState={hudState} onLogout={onGameExit} />
 
       {/* ►► SCOREBOARD ◄◄ */}
       {showScore && (

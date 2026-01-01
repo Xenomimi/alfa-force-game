@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoginRegisterScreen from './Login/LoginRegisterScreen.tsx';
 import LobbyScreen from './Lobby/LobbyScreen.tsx';
 import GameComponent from './Game/GameComponent.tsx';
@@ -41,6 +41,23 @@ const App: React.FC = () => {
     const [lobbyRoom, setLobbyRoom] = useState<Room | null>(null);
     const [gameRoom, setGameRoom] = useState<Room | null>();
     const [userData, setUserData] = useState<UserData | null>(null);
+
+    const refreshUserData = useCallback(async () => {
+        try {
+            const res = await fetch("http://localhost:4000/auth/me", {
+                credentials: "include"
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.loggedIn) {
+                    setUserData(data);
+                    console.log("Dane użytkownika odświeżone:", data);
+                }
+            }
+        } catch (err) {
+            console.error("Błąd odświeżania danych:", err);
+        }
+    }, []);
 
     const handleLogin = async () => {
         // sprawdź sesję po zalogowaniu
