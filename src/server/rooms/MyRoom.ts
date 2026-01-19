@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { Player } from "../schema/Player";
 import { Bullet } from "../schema/Bullet";
 import { MyRoomState } from "../schema/MyRoomState";
-import mapData from "../../assets/map_data.json";
+import mapData from "../../assets/map3_data.json";
 import Matter from 'matter-js';
 import { JWT } from "@colyseus/auth"
 import { JWT_SECRET } from "../routers/auth";
@@ -147,7 +147,7 @@ export class MyRoom extends Room<MyRoomState> {
             throw new Error("Brak profilu lub statystyk dla użytkownika");
         }
         // Najpierw tworzymy ciało gracza w silniku fizyki
-        const startX = 800;
+        const startX = 1000;
         const startY = 300;
         const playerWidth = 36;
         const playerHeight = 140;
@@ -383,7 +383,7 @@ export class MyRoom extends Room<MyRoomState> {
             const bodyRef = this.playerBodies.get(player.id);
             if (bodyRef && this.state.playerEntities.has(player.id)) {
                 // Tutaj warto dodać logikę bezpiecznego respawnu (losowe punkty na mapie)
-                Matter.Body.setPosition(bodyRef, { x: 800, y: 300 }); 
+                Matter.Body.setPosition(bodyRef, { x: 1000, y: 300 }); 
                 Matter.Body.setVelocity(bodyRef, { x: 0, y: 0 });
                 
                 player.health = player.maxHealth;

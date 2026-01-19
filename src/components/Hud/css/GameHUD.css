@@ -37,14 +37,14 @@
 }
 
 .hud-weapon {
-  background-color: var(--bg-dark-tertiary);
+  background: linear-gradient(90deg, rgba(10,10,15,0.6) 0%, rgba(22,27,34,0.6) 100%);
   border: 1px solid #e94560;
   padding: 12px 18px;
   border-radius: 6px;
   font-weight: 600;
   font-size: 14px;
   color: white;
-
+  backdrop-filter: blur(8px);
   width: 160px;   /* przykładowa stała szerokość */
   height: 94px;  /* przykładowa stała wysokość */
 

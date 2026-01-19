@@ -6,7 +6,7 @@ import { Room, getStateCallbacks } from 'colyseus.js';
 import { Player } from "./pixiPlayer";
 import { Bullet } from "./pixiBullet";
 import { CameraController } from "./CameraController";
-import mapData from "../assets/map_data.json";
+import mapData from "../assets/map3_data.json";
 import { Weapon } from "../server/game/weapons";
 import { HudState } from '../components/Game/GameComponent';
 import { MapSchema } from '@colyseus/schema';
@@ -68,11 +68,11 @@ export class Game {
     room: Room<any>;
     roomCallBacks: any;
     accumulator: number = 0;
-    fixedDelta: number = 1000 / 60; // 16.67ms
+    fixedDelta: number = 1000 / 144; // 16.67ms
     allWeapons: Record<number, Weapon> = {};
     userWeapons: number[] = [];
     isSwitchingWeapon: boolean = false;
-    private lastPlayerPos: Point = { x: 800, y: 300 }
+    private lastPlayerPos: Point = { x: 1000, y: 300 }
     private shootSound!: HTMLAudioElement;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleKeyUp: (event: KeyboardEvent) => void;
@@ -87,7 +87,7 @@ export class Game {
         input: {left: boolean, right: boolean, jump: boolean};
     }> = [];
     private currentWeaponIndex: number = 0;
-    private serverPosition: any = { x: 800, y: 300, dx: 0, dy: 0 };
+    private serverPosition: any = { x: 1000, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
     private onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void;
 
@@ -178,7 +178,7 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            // this.drawDebugBodies();
+            this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }
@@ -207,7 +207,7 @@ export class Game {
     }
 
     private addPlayer() {
-        this.player = new Player(this.room?.sessionId, 800, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport, this.userWeapons[0]);
+        this.player = new Player(this.room?.sessionId, 1000, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport, this.userWeapons[0]);
         const speedX = 15;
         const jumpVelocity = -20;
 
@@ -326,7 +326,7 @@ export class Game {
                 console.log("YOU joined:", sessionId);
             } else {
                 // Tworzymy nowego gracza z pozycją z serwera
-                const newPlayer = new Player(sessionId, player.x || 800, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport, player.currentWeaponId);
+                const newPlayer = new Player(sessionId, player.x || 1000, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport, player.currentWeaponId);
                 newPlayer.playerName = player.name || "Anon";
                 newPlayer.drawPlayerName();
                 otherPlayers[sessionId] = newPlayer;
@@ -665,11 +665,15 @@ export class Game {
         // Tworzenie kontenerów dla różnych warstw gry
         this.backgroundSprite.texture = PIXI.Texture.from('background');
         this.foregroundSprite.texture = PIXI.Texture.from('foreground');
-        this.backgroundSprite.width = 3360;
-        this.backgroundSprite.height = 2538;
-        this.foregroundSprite.width = 3360;
-        this.foregroundSprite.height = 2538;
+        // this.backgroundSprite.width = 3360;
+        // this.backgroundSprite.height = 2538;
+        // this.foregroundSprite.width = 3360;
+        // this.foregroundSprite.height = 2538;
 
+        this.backgroundSprite.width = 7056;
+        this.backgroundSprite.height = 5328;
+        this.foregroundSprite.width = 7056;
+        this.foregroundSprite.height = 5328;
         this.backgroundContainer = new PIXI.Container({label : 'backgroundContainer'});
         this.gameContainer = new PIXI.Container({label : 'gameContainer'});
         this.foregroundContainer = new PIXI.Container({label : 'foregroundContainer'});
@@ -685,8 +689,12 @@ export class Game {
         this.viewport = new Viewport({
             screenWidth: this.app.canvas.width,
             screenHeight: this.app.canvas.height,
-            worldWidth: 3360,
-            worldHeight: 2538,
+            // worldWidth: 3360,
+            // worldHeight: 2538,
+            worldWidth: 7056,
+            worldHeight: 5328,
+
+
             ticker: this.app.ticker,
             events: this.app.renderer.events
         });
@@ -701,7 +709,7 @@ export class Game {
             // .drag()
             // .pinch()
             // .decelerate()
-            // .wheel()
+            .wheel()
             .clamp({ direction: 'all' })
             .clampZoom({ minWidth: 1920, minHeight: 1080, maxWidth: 3360, maxHeight: 2538 });
     }
@@ -927,10 +935,10 @@ export class Game {
                     x: (obj.x + point.x) * scaleFactor,
                     y: (obj.y + point.y) * scaleFactor
                 }));
-                graphics.poly(pixiPoints.flatMap(p => [p.x, p.y]), true).stroke({ width: 2, color: 0x0000ff, join: 'round' });
+                // graphics.poly(pixiPoints.flatMap(p => [p.x, p.y]), true).stroke({ width: 2, color: 0x0000ff, join: 'round' });
 
             } else {
-                graphics.rect(obj.x * scaleFactor, obj.y * scaleFactor, obj.width * scaleFactor, obj.height * scaleFactor)
+                // graphics.rect(obj.x * scaleFactor, obj.y * scaleFactor, obj.width * scaleFactor, obj.height * scaleFactor)
                 const mapElementBody = Matter.Bodies.rectangle(
                     (obj.x + obj.width / 2) * scaleFactor,
                     (obj.y + obj.height / 2) * scaleFactor,

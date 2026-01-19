@@ -120,8 +120,6 @@ router.get("/me", verifyToken, async (req, res) => {
     });
 
     if (!user || !user.profile) return res.status(404).json({ loggedIn: false });
-
-    // --- FIX START: To jest kluczowe miejsce ---
     // Obliczamy ile XP potrzeba na obecnym poziomie i jaki jest postęp
     const nextLevelXP = LevelSystem.getMaxXPForLevel(user.profile.level);
     const levelProgress = LevelSystem.getProgressPercent(user.profile.level, user.profile.experience);
@@ -136,7 +134,6 @@ router.get("/me", verifyToken, async (req, res) => {
         },
         token: req.cookies.token 
     });
-    // --- FIX END ---
 
   } catch (e) {
     console.error(e); // Warto dodać logowanie błędu
