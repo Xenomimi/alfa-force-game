@@ -31,6 +31,10 @@ export class Player extends Schema {
   @type("number") ammo: number = 30;
   @type({ map: "boolean" }) reloadingWeapons = new MapSchema<boolean>();
 
+  // Jetpack
+  @type("number") jetpackEnergy: number = 100;
+  @type("number") maxJetpackEnergy: number = 100;
+
   // Sterowanie
   @type(PlayerInput) input = new PlayerInput();
 
@@ -43,5 +47,6 @@ export class Player extends Schema {
     this.health = health;
     this.maxHealth = health;
     this.name = name;
+    this.jetpackEnergy = this.maxJetpackEnergy;
   }
 }

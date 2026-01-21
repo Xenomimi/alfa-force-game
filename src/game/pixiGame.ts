@@ -44,6 +44,8 @@ type PlayerSchema = {
     lastInputTick: number;
     currentWeaponId: number;
     ammo: number;
+    jetpackEnergy: number;
+    maxJetpackEnergy: number;
     reloadingWeapons: MapSchema<boolean>;
     input: PlayerInputSchema;
 };
@@ -81,6 +83,12 @@ export class Game {
     private boundHandleMouseWheel: (event: WheelEvent) => void;
     private shootingInterval: NodeJS.Timeout | null = null;
     private fireRate: number = 1000; // domyślny czas między strzałami
+    private jetpackEnergy: number = 100;
+    private maxJetpackEnergy: number = 100;
+    private jetpackDrainPerSecond: number = 35;
+    private jetpackRechargePerSecond: number = 20;
+    private jetpackThrust: number = -20;
+    private latestInput: PlayerInputSchema = { left: false, right: false, jump: false };
     private inputSequence: number = 0;
     private pendingInputs: Array<{
         tick: number;
@@ -178,7 +186,7 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            this.drawDebugBodies();
+            // this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }
@@ -209,7 +217,7 @@ export class Game {
     private addPlayer() {
         this.player = new Player(this.room?.sessionId, 1000, 300, this.gameContainer, this.world, false, this.bullets, this.room, this.viewport, this.userWeapons[0]);
         const speedX = 15;
-        const jumpVelocity = -20;
+        const jetpackThrust = this.jetpackThrust;
 
         this.app.ticker.add(() => {
             if (!this.player._armatureDisplay) return;
@@ -219,6 +227,7 @@ export class Game {
                 right: keysPressed['d'] || false,
                 jump: keysPressed['w'] || false
             };
+            this.latestInput = input;
             // 2. Wyślij do serwera
             this.inputSequence++;
             this.room?.send("input", {
@@ -237,17 +246,21 @@ export class Game {
                 this.pendingInputs.shift();
             }
             // 4. Zastosuj input do fizyki (predykcja lokalna) – przenieś do fixed loopa, jeśli możesz
+            const jetpackActive = input.jump && this.jetpackEnergy > 0;
+            const adjustedInput = { ...input, jump: jetpackActive };
             this.applyInput(
                 this.player.playerMatterBody,
-                input,
+                adjustedInput,
                 speedX,
-                jumpVelocity
+                jetpackThrust
             );
             // 5. Interpolacja wizualna PIXI -> MATTER  
             const currentPos = this.player.playerMatterBody.position;
             const alpha = Math.min(this.accumulator / this.fixedDelta, 1);
             this.player.playerContainer.x = this.player.x = this.lastPlayerPos.x + (currentPos.x - this.lastPlayerPos.x) * alpha;
             this.player.playerContainer.y = this.player.y = this.lastPlayerPos.y + (currentPos.y - this.lastPlayerPos.y) * alpha;
+            this.player.setJetpackActive(jetpackActive);
+            this.player.updateJetpackParticles(this.app.ticker.deltaMS / 1000);
 
             // 6. Animacje
             const moving = input.left || input.right;
@@ -283,11 +296,19 @@ export class Game {
                     maxAmmo: this.allWeapons[this.userWeapons[0]].amunition,
                     health: player.maxHealth,
                     maxHealth: player.maxHealth,
+                    jetpackEnergy: player.jetpackEnergy,
+                    maxJetpackEnergy: player.maxJetpackEnergy,
                  });
             }
             if (sessionId === this.room!.sessionId) {
                 this.player.playerName = player.name || "Anon";
                 this.player.drawPlayerName();
+                if (player.jetpackEnergy !== undefined) {
+                    this.jetpackEnergy = player.jetpackEnergy;
+                }
+                if (player.maxJetpackEnergy !== undefined) {
+                    this.maxJetpackEnergy = player.maxJetpackEnergy;
+                }
                 this.roomCallBacks(player).onChange(() => {
 
                     const updates: Partial<HudState> = {};
@@ -302,6 +323,14 @@ export class Game {
 
                     if (player.health !== undefined) updates.health = player.health;
                     if (player.maxHealth !== undefined) updates.maxHealth = player.maxHealth;
+                    if (player.jetpackEnergy !== undefined) {
+                        this.jetpackEnergy = player.jetpackEnergy;
+                        updates.jetpackEnergy = player.jetpackEnergy;
+                    }
+                    if (player.maxJetpackEnergy !== undefined) {
+                        this.maxJetpackEnergy = player.maxJetpackEnergy;
+                        updates.maxJetpackEnergy = player.maxJetpackEnergy;
+                    }
                     
                     if (this.onHudUpdate && Object.keys(updates).length > 0) {
                         this.onHudUpdate(updates);
@@ -346,6 +375,13 @@ export class Game {
                         other.dx = player.dx;
                         other.dy = player.dy;
                         other.isMoving = player.input.left || player.input.right;
+                        if (player.jetpackEnergy !== undefined) {
+                            other.jetpackEnergy = player.jetpackEnergy;
+                        }
+                        if (player.maxJetpackEnergy !== undefined) {
+                            other.maxJetpackEnergy = player.maxJetpackEnergy;
+                        }
+                        other.setJetpackActive(player.input.jump && player.jetpackEnergy > 0);
                         other.positionBuffer.push({
                                                 x: player.x,
                                                 y: player.y,
@@ -431,6 +467,7 @@ export class Game {
         const renderTime = Date.now() - 20; // 100ms opóźnienie dla płynności
 
         this.app.ticker.add(() => {
+            const deltaSeconds = this.app.ticker.deltaMS / 1000;
             for (let id in otherPlayers) {
                 const player = otherPlayers[id];
                 if (!player || !player.positionBuffer) continue;
@@ -474,6 +511,7 @@ export class Game {
                 player.playerContainer.x = player.x = player.playerMatterBody.position.x;
                 player.playerContainer.y = player.y = player.playerMatterBody.position.y;
                 player.updateRemoteHandPositionAngle();
+                player.updateJetpackParticles(deltaSeconds);
 
                 // Animacje
                 if (!player._armatureDisplay || !player._armatureDisplay.animation) continue;
@@ -487,12 +525,27 @@ export class Game {
         });
     }
 
-    // Funkcja pomocnicza do aplikowania inputu
+    // Jetpack energy tick
+    private updateJetpackEnergy(input: PlayerInputSchema, deltaMs: number) {
+        const deltaSeconds = deltaMs / 1000;
+        const wantsJetpack = input.jump;
+        const jetpackActive = wantsJetpack && this.jetpackEnergy > 0;
+
+        if (jetpackActive) {
+            this.jetpackEnergy = Math.max(0, this.jetpackEnergy - this.jetpackDrainPerSecond * deltaSeconds);
+        } else if (!wantsJetpack) {
+            this.jetpackEnergy = Math.min(
+                this.maxJetpackEnergy,
+                this.jetpackEnergy + this.jetpackRechargePerSecond * deltaSeconds
+            );
+        }
+    }
+
     private applyInput(
         body: Matter.Body,
         input: {left: boolean, right: boolean, jump: boolean},
         speedX: number,
-        jumpVelocity: number
+        jetpackThrust: number
     ) {
         let velocity = { x: body.velocity.x, y: body.velocity.y };
         if (input.left) {
@@ -503,7 +556,7 @@ export class Game {
             velocity.x = 0; // damping tylko bez ruchu
         }
         if (input.jump) {
-            velocity.y = jumpVelocity;
+            velocity.y = jetpackThrust;
         }
         Matter.Body.setVelocity(body, velocity);
     }
@@ -613,9 +666,11 @@ export class Game {
                 
                 if (this.pendingInputs.length) {
                     this.pendingInputs.forEach(p => {
-                        this.applyInput(this.player.playerMatterBody, p.input, 15, -20);
+                        const adjustedInput = { ...p.input, jump: p.input.jump && this.jetpackEnergy > 0 };
+                        this.applyInput(this.player.playerMatterBody, adjustedInput, 15, this.jetpackThrust);
                     });
                 }
+                this.updateJetpackEnergy(this.latestInput, this.fixedDelta);
 
                 Matter.Engine.update(this.engine, this.fixedDelta);
                 this.pendingInputs = this.pendingInputs.filter(p => p.tick > this.serverTick);

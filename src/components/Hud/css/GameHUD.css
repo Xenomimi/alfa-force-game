@@ -96,6 +96,11 @@
   color: #39ff14;
 }
 
+.hud-bar.jetpack {
+  border: 1px solid #00d9ff;
+  color: #00d9ff;
+}
+
 .hud-value {
   font-size: 18px;
   font-weight: bold;

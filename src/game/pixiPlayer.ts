@@ -16,6 +16,16 @@ type PositionSnapshot = {
     timestamp: number;
 };
 
+type JetpackParticle = {
+    sprite: PIXI.Sprite;
+    vx: number;
+    vy: number;
+    life: number;
+    maxLife: number;
+    spin: number;
+    baseScale: number;
+};
+
 export class Player {
     protected readonly _resources: string[] = [];
     protected _pixiResources: any;
@@ -44,6 +54,9 @@ export class Player {
     aimAngle: number;
     dx: number;
     dy: number;
+    jetpackEnergy: number = 0;
+    maxJetpackEnergy: number = 100;
+    jetpackActive: boolean = false;
     // health: number;
     // maxHealth: number;
     // deathAnimation: {
@@ -56,6 +69,9 @@ export class Player {
     imagesLoaded: boolean = false;
     playerContainer: PIXI.Container;
     parentContainer: PIXI.Container;
+    private jetpackParticleContainer: PIXI.Container;
+    private jetpackParticles: JetpackParticle[] = [];
+    private jetpackSpawnAccumulator: number = 0;
     factory: PixiFactory;
     playerMatterBody: Matter.Body;
     psyhicsWorld: Matter.World;
@@ -129,7 +145,9 @@ export class Player {
         this.playerContainer = new PIXI.Container();
         this.factory = PixiFactory.factory; 
 
-        
+        this.jetpackParticleContainer = new PIXI.Container();
+        this.parentContainer.addChild(this.jetpackParticleContainer);
+
         this.init(this.playerContainer);
         this.parentContainer.addChild(this.playerContainer);
     }
@@ -404,6 +422,72 @@ export class Player {
 //         this.verticalSpeed = 0;
 //     }
 
+    setJetpackActive(active: boolean) {
+        this.jetpackActive = active;
+    }
+
+    updateJetpackParticles(deltaSeconds: number) {
+        if (!this.jetpackParticleContainer || deltaSeconds <= 0) return;
+
+        const spawnRate = this.jetpackActive ? 45 : 0;
+        this.jetpackSpawnAccumulator += deltaSeconds * spawnRate;
+
+        while (this.jetpackSpawnAccumulator >= 1) {
+            this.jetpackSpawnAccumulator -= 1;
+            this.spawnJetpackParticle();
+        }
+
+        for (let i = this.jetpackParticles.length - 1; i >= 0; i--) {
+            const particle = this.jetpackParticles[i];
+            particle.life -= deltaSeconds;
+
+            if (particle.life <= 0) {
+                particle.sprite.removeFromParent();
+                particle.sprite.destroy();
+                this.jetpackParticles.splice(i, 1);
+                continue;
+            }
+
+            const t = particle.life / particle.maxLife;
+            particle.sprite.x += particle.vx * deltaSeconds;
+            particle.sprite.y += particle.vy * deltaSeconds;
+            particle.sprite.alpha = t;
+            particle.sprite.scale.set(particle.baseScale * t);
+            particle.sprite.rotation += particle.spin * deltaSeconds;
+        }
+    }
+
+    private spawnJetpackParticle() {
+        const sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        const colors = [0xffb347, 0xff7a18, 0x68e6ff];
+        const facingLeft = this._armatureDisplay?.armature?.flipX ?? false;
+        const size = 6 + Math.random() * 12;
+
+        sprite.tint = colors[Math.floor(Math.random() * colors.length)];
+        sprite.blendMode = 'add';
+        sprite.anchor.set(0.5);
+        sprite.scale.set(size);
+        sprite.alpha = 0.9;
+
+        const offsetX = (facingLeft ? 16 : -16) + (Math.random() * 6 - 3);
+        const offsetY = 40 + Math.random() * 8;
+        sprite.position.set(this.playerContainer.x + offsetX, this.playerContainer.y + offsetY);
+
+        const maxLife = 0.45 + Math.random() * 0.25;
+        const particle: JetpackParticle = {
+            sprite,
+            vx: (Math.random() * 20 - 10) + (facingLeft ? 12 : -12),
+            vy: 120 + Math.random() * 60,
+            life: maxLife,
+            maxLife,
+            spin: (Math.random() * 2 - 1) * 4,
+            baseScale: size
+        };
+
+        this.jetpackParticles.push(particle);
+        this.jetpackParticleContainer.addChild(sprite);
+    }
+
     drawPlayerName() {
         const nameY = this.bottom - this.height - 15;
 
@@ -427,6 +511,12 @@ export class Player {
         if (this.playerContainer && this.playerContainer.parent) {
             this.playerContainer.parent.removeChild(this.playerContainer);
         }
+
+        if (this.jetpackParticleContainer && this.jetpackParticleContainer.parent) {
+            this.jetpackParticleContainer.parent.removeChild(this.jetpackParticleContainer);
+            this.jetpackParticleContainer.destroy({ children: true });
+        }
+        this.jetpackParticles = [];
         
         if (this._armatureDisplay) {
             this._armatureDisplay.dispose();

@@ -21,6 +21,8 @@ export interface HudState {
     nextLevelXP: number;  // Teraz to jest "maksimum tego paska" (np. 100)
     coins: number;
     cash: number;
+    jetpackEnergy: number;
+    maxJetpackEnergy: number;
     levelProgress?: number; // Gotowy % (opcjonalny, bo możemy go wyliczyć)
     addedXP?: number;
     addedCoins?: number;
@@ -67,6 +69,8 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
         nextLevelXP: initialNextLevelXP, 
         coins: profile?.coins || 0,
         cash: profile?.cash || 0,
+        jetpackEnergy: 100,
+        maxJetpackEnergy: 100,
         levelProgress: Math.min(100, Math.max(0, initialProgress))
     });
 

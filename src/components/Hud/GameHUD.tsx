@@ -39,6 +39,10 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState, score
       ? Math.min(100, Math.max(0, (hudState.health / hudState.maxHealth) * 100))
       : 0;
 
+    const jetpackPercentage = hudState.maxJetpackEnergy > 0
+      ? Math.min(100, Math.max(0, (hudState.jetpackEnergy / hudState.maxJetpackEnergy) * 100))
+      : 0;
+
 
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
@@ -134,6 +138,20 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState, score
             </div>
 
             {/* Pasek ŻYCIA */}
+            <div className="hud-bar jetpack">
+              <div className="hud-text-row">
+                <span className="hud-label">Energia Jetpacka</span>
+                <span className="hud-value">{Math.ceil(hudState.jetpackEnergy)} / {hudState.maxJetpackEnergy}</span>
+              </div>
+              <div className="hud-progress-track">
+                <div 
+                  className="hud-progress-fill" 
+                  style={{ width: `${jetpackPercentage}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Pasek ZYCIA */}
             <div className="hud-bar health">
               <div className="hud-text-row">
                 <span className="hud-label">Punkty życia</span>

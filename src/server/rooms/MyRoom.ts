@@ -73,7 +73,10 @@ export class MyRoom extends Room<MyRoomState> {
     private playerBodies: Map<string, Matter.Body> = new Map();
     private bulletBodies: Map<string, Matter.Body> = new Map();
     private moveSpeed = 15;
-    private jumpVelocity = -20;
+    private jetpackThrust = -20;
+    private jetpackMaxEnergy = 100;
+    private jetpackDrainPerSecond = 35;
+    private jetpackRechargePerSecond = 20;
     private enlapsedTime = 0;
     private fixedTimeStep = 1000 / 60;
 
@@ -173,6 +176,8 @@ export class MyRoom extends Room<MyRoomState> {
             auth.profile.stats.health,
             client.auth.username
         );
+        playerState.maxJetpackEnergy = this.jetpackMaxEnergy;
+        playerState.jetpackEnergy = this.jetpackMaxEnergy;
 
         const userInventory = auth.profile.inventory || [];
         const userWeaponIds = userInventory.map((item) => item.weaponId);
@@ -391,6 +396,7 @@ export class MyRoom extends Room<MyRoomState> {
                 const currentMag = Weapons[player.currentWeaponId]?.amunition || 30;
                 player.weaponMagazines.set(player.currentWeaponId, currentMag);
                 player.ammo = currentMag;
+                player.jetpackEnergy = player.maxJetpackEnergy;
                 
                 player.isAlive = true;
             }
@@ -398,6 +404,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     updateEngine(deltaTime: number) {
+        const deltaSeconds = deltaTime / 1000;
         for (const [sessionId, body] of this.playerBodies.entries()) {
             const player = this.state.playerEntities.get(sessionId);
             if (player) {
@@ -417,8 +424,17 @@ export class MyRoom extends Room<MyRoomState> {
                 //     velocity.y = this.jumpVelocity;
                 // }
 
-                if (player.input.jump) {
-                    velocity.y = this.jumpVelocity;
+                const wantsJetpack = player.input.jump;
+                const jetpackActive = wantsJetpack && player.jetpackEnergy > 0;
+
+                if (jetpackActive) {
+                    player.jetpackEnergy = Math.max(0, player.jetpackEnergy - this.jetpackDrainPerSecond * deltaSeconds);
+                    velocity.y = this.jetpackThrust;
+                } else if (!wantsJetpack) {
+                    player.jetpackEnergy = Math.min(
+                        player.maxJetpackEnergy,
+                        player.jetpackEnergy + this.jetpackRechargePerSecond * deltaSeconds
+                    );
                 }
                 Matter.Body.setVelocity(body, velocity);
             }
