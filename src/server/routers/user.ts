@@ -1,7 +1,5 @@
 import express from "express";
 import { prisma } from "../index";
-import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "./auth";
 import { verifyToken } from "../middleware/verifyToken";
 import { LevelSystem } from "../game/levelSystem";
 const router = express.Router();
@@ -54,17 +52,67 @@ router.get("/inventory", verifyToken, async (req, res) => {
 });
 
 router.get("/playerstats", verifyToken, async (req, res) => {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).json({ loggedIn: false });
     try {
-        const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
-        const stats = await prisma.playerStats.findUnique({ where: { id: decoded.userId } });
-        
-        if (!stats) return res.status(404).json({ stats: false });
-        res.json(stats);
+        const userId = (req as any).userId as number;
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { profile: { include: { stats: true } } }
+        });
+
+        if (!user || !user.profile || !user.profile.stats) {
+            return res.status(404).json({ stats: false });
+        }
+
+        res.json(user.profile.stats);
     } catch (err) {
         console.error("Błąd przy pobieraniu broni:", err);
         res.status(500).json({ error: "Błąd serwera przy pobieraniu broni" });
+    }
+});
+
+router.post("/assign-skill", verifyToken, async (req, res) => {
+    try {
+        const userId = (req as any).userId as number;
+        const { stat } = req.body as { stat?: string };
+
+        const allowedStats = ["accuracy"];
+        if (!stat || !allowedStats.includes(stat)) {
+            return res.status(400).json({ error: "Nieprawidłowa umiejętność" });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { profile: { include: { stats: true } } }
+        });
+
+        if (!user || !user.profile || !user.profile.stats) {
+            return res.status(404).json({ error: "Nie znaleziono profilu" });
+        }
+
+        if (user.profile.skillPoints <= 0) {
+            return res.status(400).json({ error: "Brak punktów umiejętności" });
+        }
+
+        const statUpdate: Record<string, any> = {};
+        if (stat === "accuracy") statUpdate.accuracy = { increment: 1 };
+
+        const updatedProfile = await prisma.playerProfile.update({
+            where: { id: user.profile.id },
+            data: {
+                skillPoints: { decrement: 1 },
+                stats: { update: statUpdate }
+            },
+            include: { stats: true }
+        });
+
+        res.json({
+            success: true,
+            skillPoints: updatedProfile.skillPoints,
+            stats: updatedProfile.stats
+        });
+    } catch (err) {
+        console.error("Błąd przy przypisywaniu punktu:", err);
+        res.status(500).json({ error: "Błąd serwera przy przypisywaniu punktu" });
     }
 });
 

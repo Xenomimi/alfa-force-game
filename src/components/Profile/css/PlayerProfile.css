@@ -61,6 +61,61 @@
   font-size:14px;color:var(--text-secondary);
 }
 
+.skill-points{
+  margin-top:12px;
+  width:100%;
+  background:var(--bg-dark-tertiary);
+  border:1px solid var(--border-color);
+  border-radius:6px;
+  padding:12px;
+  text-align:left;
+}
+
+.skill-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:13px;
+  color:var(--text-secondary);
+  margin-bottom:8px;
+}
+
+.skill-header strong{color:var(--accent-green);}
+
+.skill-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:14px;
+  color:var(--text-primary);
+}
+
+.skill-controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.skill-btn{
+  width:28px;
+  height:28px;
+  border-radius:4px;
+  border:1px solid var(--border-color);
+  background:var(--bg-dark-secondary);
+  color:#fff;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.skill-btn:hover{background:var(--bg-dark-tertiary);}
+.skill-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+.skill-error{
+  margin-top:6px;
+  font-size:12px;
+  color:var(--accent-red);
+}
+
 /*  EKWIPUNEK  */
 .equip-card h4{
   margin:0 0 12px;font-size:13px;

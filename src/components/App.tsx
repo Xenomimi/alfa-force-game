@@ -19,6 +19,7 @@ export interface UserProfile {
   experience: number;
   coins: number;
   cash: number;
+  skillPoints: number;
   stats: PlayerStats;
 }
 

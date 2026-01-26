@@ -46,6 +46,7 @@ type PlayerSchema = {
     ammo: number;
     jetpackEnergy: number;
     maxJetpackEnergy: number;
+    accuracy: number;
     reloadingWeapons: MapSchema<boolean>;
     input: PlayerInputSchema;
 };
@@ -303,6 +304,9 @@ export class Game {
             if (sessionId === this.room!.sessionId) {
                 this.player.playerName = player.name || "Anon";
                 this.player.drawPlayerName();
+                if (player.accuracy !== undefined) {
+                    this.player.accuracy = player.accuracy;
+                }
                 if (player.jetpackEnergy !== undefined) {
                     this.jetpackEnergy = player.jetpackEnergy;
                 }
@@ -323,6 +327,9 @@ export class Game {
 
                     if (player.health !== undefined) updates.health = player.health;
                     if (player.maxHealth !== undefined) updates.maxHealth = player.maxHealth;
+                    if (player.accuracy !== undefined) {
+                        this.player.accuracy = player.accuracy;
+                    }
                     if (player.jetpackEnergy !== undefined) {
                         this.jetpackEnergy = player.jetpackEnergy;
                         updates.jetpackEnergy = player.jetpackEnergy;
@@ -358,6 +365,9 @@ export class Game {
                 const newPlayer = new Player(sessionId, player.x || 1000, player.y || 300, this.gameContainer, this.world, true, this.bullets, this.room, this.viewport, player.currentWeaponId);
                 newPlayer.playerName = player.name || "Anon";
                 newPlayer.drawPlayerName();
+                if (player.accuracy !== undefined) {
+                    newPlayer.accuracy = player.accuracy;
+                }
                 otherPlayers[sessionId] = newPlayer;
                 newPlayer.positionBuffer = [];
                 // Synchronizuj jego pozycję z serwera
@@ -375,6 +385,9 @@ export class Game {
                         other.dx = player.dx;
                         other.dy = player.dy;
                         other.isMoving = player.input.left || player.input.right;
+                        if (player.accuracy !== undefined) {
+                            other.accuracy = player.accuracy;
+                        }
                         if (player.jetpackEnergy !== undefined) {
                             other.jetpackEnergy = player.jetpackEnergy;
                         }
@@ -525,7 +538,16 @@ export class Game {
         });
     }
 
-    // Jetpack energy tick
+    private getCrosshairRadius(): number {
+        const maxRadius = 50;
+        const minRadius = 4;
+        const accuracy = this.player?.accuracy ?? 0;
+        const clamped = Math.max(0, Math.min(accuracy, 50));
+        const t = clamped / 50;
+        return maxRadius - (maxRadius - minRadius) * t;
+    }
+    
+    
     private updateJetpackEnergy(input: PlayerInputSchema, deltaMs: number) {
         const deltaSeconds = deltaMs / 1000;
         const wantsJetpack = input.jump;
@@ -838,7 +860,7 @@ export class Game {
     }
 
     private createPointer(container: PIXI.Container) {
-        const circle = new PIXI.Graphics().circle(0, 0, 8).fill({ color: 0xffffff }).stroke({ color: 0x111111, alpha: 0.87, width: 1 })
+        const circle = new PIXI.Graphics();
         container.addChild(circle);
         circle.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
         this.app.stage.hitArea = this.app.screen;
@@ -847,6 +869,9 @@ export class Game {
             let mousePosition = this.viewport.toLocal(global);
             this.mouseX = mousePosition.x;
             this.mouseY = mousePosition.y;
+            const radius = this.getCrosshairRadius();
+            circle.clear();
+            circle.circle(0, 0, radius).fill({ color: 0xffffff, alpha: 0.9 }).stroke({ color: 0x111111, alpha: 0.87, width: 1 });
             circle.position.copyFrom(mousePosition);
         });
     }
@@ -1061,3 +1086,5 @@ export class Game {
     //     return { x: 850, y: 300 };
     // }
 }
+
+

@@ -28,6 +28,7 @@ model PlayerProfile {
   cash          Int             @default(0)
   totalKills    Int             @default(0)
   totalDeaths   Int             @default(0)
+  skillPoints   Int             @default(0)
   createdAt     DateTime       @default(now())
 
   lastLogin     DateTime?

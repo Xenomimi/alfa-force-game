@@ -77,6 +77,7 @@ export class Player {
     psyhicsWorld: Matter.World;
     ammo: number = 0; 
     reloadingWeapons: MapSchema<boolean> = new MapSchema<boolean>();
+    accuracy: number = 0;
     globalBulletList: Bullet[] = [];
     gameRoom: Room<any>;
 
@@ -278,6 +279,22 @@ export class Player {
         }
     }
 
+    private getSpreadRadius(): number {
+        const maxRadius = 50;
+        const minRadius = 4;
+        const clamped = Math.max(0, Math.min(this.accuracy, 50));
+        const t = clamped / 50;
+        return maxRadius - (maxRadius - minRadius) * t;
+    }
+
+    private getRandomSpreadOffset(radius: number): { x: number; y: number } {
+        const angle = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random()) * radius;
+        return {
+            x: Math.cos(angle) * r,
+            y: Math.sin(angle) * r
+        };
+    }
     shoot(shootSound: HTMLAudioElement) {
         if (!this.isAlive) return;
         if (!this.weaponBone) return;
@@ -287,9 +304,18 @@ export class Player {
         const startPos = this.viewport.toLocal(globalPos);
 
         const offset = this.shootingPointOffsetX; // odległość od ręki, z której wychodzi pocisk
+        const distance = Math.max(1, Math.hypot(this.dx, this.dy));
+        const spreadRadius = this.getSpreadRadius();
+        const spreadOffset = this.getRandomSpreadOffset(spreadRadius);
+        const baseTargetX = startPos.x + Math.cos(this.aimAngle) * distance;
+        const baseTargetY = startPos.y + Math.sin(this.aimAngle) * distance;
+        const finalAimAngle = Math.atan2(
+            baseTargetY + spreadOffset.y - startPos.y,
+            baseTargetX + spreadOffset.x - startPos.x
+        );
 
-        const offsetX = Math.cos(this.aimAngle) * offset;
-        const offsetY = Math.sin(this.aimAngle) * offset;
+        const offsetX = Math.cos(finalAimAngle) * offset;
+        const offsetY = Math.sin(finalAimAngle) * offset;
 
         const collisions = Matter.Query.ray(this.psyhicsWorld.bodies, startPos, {
             x: startPos.x + offsetX,
@@ -308,7 +334,7 @@ export class Player {
         const bullet = new Bullet(
             startPos.x + offsetX,
             startPos.y + offsetY,
-            this.aimAngle,
+            finalAimAngle,
             this.id || "undefined",
             this.parentContainer,
             this.psyhicsWorld
@@ -317,7 +343,7 @@ export class Player {
         this.globalBulletList.push(bullet);
 
         this.gameRoom.send("shoot", { 
-            angle: this.aimAngle,
+            angle: finalAimAngle,
             x: startPos.x + offsetX, 
             y: startPos.y + offsetY,
         });
@@ -552,3 +578,9 @@ export class Player {
 //         this.container.addChild(text);
 //     }
 }
+
+
+
+
+
+

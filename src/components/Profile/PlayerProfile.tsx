@@ -37,6 +37,7 @@ interface PlayerInfo {
     cash: number;
     totalKills: number;
     totalDeaths: number;
+    skillPoints: number;
   }
 }
 
@@ -48,6 +49,8 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   const [artifacts, setArtifacts] = useState<Item<ArtifactStats>[]>([]); // Placeholder na przyszłość
   const [userStats, setUserStats] = useState<UserStats>({ health: 0, armor: 0, strength: 0, agility: 0, intelligence: 0, accuracy: 0 });
   const [userInfo, setUserInfo] = useState<PlayerInfo | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   // Stan modala sprzedaży
   const [sellItem, setSellItem] = useState<Item | null>(null);
@@ -80,6 +83,36 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   }, [refreshProfileData]);
 
 
+  // --- UMIEJĘTNOŚCI ---
+  const assignSkillPoint = async (stat: "accuracy") => {
+    if (!userInfo || isAssigning) return;
+    if (userInfo.profile.skillPoints <= 0) return;
+
+    setIsAssigning(true);
+    setAssignError(null);
+    try {
+      const res = await fetch("http://localhost:4000/user/assign-skill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ stat })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Nie udało się przypisać punktu");
+
+      if (data.stats) setUserStats(data.stats);
+      if (data.skillPoints !== undefined) {
+        setUserInfo(prev => prev ? {
+          ...prev,
+          profile: { ...prev.profile, skillPoints: data.skillPoints }
+        } : prev);
+      }
+    } catch (err: any) {
+      setAssignError(err.message || "Błąd przypisywania punktu");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
   // --- LOGIKA SPRZEDAŻY ---
   const handleSellClick = (item: Item) => {
     setSellItem(item);
@@ -181,6 +214,27 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
             <div className="item-stats">
               <div className="stats-grid">{renderPlayerStats(userStats)}</div>
             </div>
+          </div>
+
+          <div className="skill-points">
+            <div className="skill-header">
+              <span>Punkty umiejętności</span>
+              <strong>{userInfo.profile.skillPoints}</strong>
+            </div>
+            <div className="skill-row">
+              <span>Celność</span>
+              <div className="skill-controls">
+                <span className="skill-value">{userStats.accuracy}</span>
+                <button
+                  className="skill-btn"
+                  disabled={isAssigning || userInfo.profile.skillPoints <= 0}
+                  onClick={() => assignSkillPoint("accuracy")}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            {assignError && <div className="skill-error">{assignError}</div>}
           </div>
           
           <div style={{marginTop: 20}}>
@@ -291,3 +345,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
 };
 
 export default PlayerProfile;
+
+
+
+

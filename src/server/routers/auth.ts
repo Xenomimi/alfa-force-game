@@ -35,6 +35,7 @@ router.post("/register", async (req, res) => {
                 level: 1,
                 experience: 0,
                 coins: 1000,
+                skillPoints: 0,
                 stats: {
                   create: {
                     health: 100,

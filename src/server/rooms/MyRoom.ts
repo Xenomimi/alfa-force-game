@@ -176,6 +176,7 @@ export class MyRoom extends Room<MyRoomState> {
             auth.profile.stats.health,
             client.auth.username
         );
+        playerState.accuracy = auth.profile.stats.accuracy;
         playerState.maxJetpackEnergy = this.jetpackMaxEnergy;
         playerState.jetpackEnergy = this.jetpackMaxEnergy;
 
@@ -331,6 +332,7 @@ export class MyRoom extends Room<MyRoomState> {
                         );
                         
                         const newTotalCoins = currentProfile.coins + REWARDS.KILL_COINS;
+                        const newSkillPoints = (currentProfile.skillPoints || 0) + result.levelsGained;
 
                         // 2. Wysyłamy do klienta zaktualizowane dane
                         killerClient.send("player_stats_update", {
@@ -339,6 +341,7 @@ export class MyRoom extends Room<MyRoomState> {
                             nextLevelXP: result.xpForNextLevel, // Maksimum paska (np. 200)
                             coins: newTotalCoins,
                             cash: currentProfile.cash,
+                            skillPoints: newSkillPoints,
                             addedXP: REWARDS.KILL_XP,
                             addedCoins: REWARDS.KILL_COINS
                         });
@@ -350,6 +353,7 @@ export class MyRoom extends Room<MyRoomState> {
                                 experience: result.newXP,  // WAŻNE: Zapisujemy resztę, a nie sumę!
                                 level: result.newLevel,
                                 coins: newTotalCoins,
+                                skillPoints: newSkillPoints,
                                 totalKills: { increment: 1 }
                             }
                         }).catch(err => console.error("DB Save Error (Killer):", err));
