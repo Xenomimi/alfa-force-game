@@ -20,9 +20,10 @@ interface LobbyScreenProps {
   client: Client | null;
   onStartGame: (room: Room) => void;
   onLogout: () => void;
+  onUserDataRefresh: () => Promise<void> | void;
 }
 
-const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame, onLogout }) => {
+const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame, onLogout, onUserDataRefresh }) => {
   const [activeSection, setActiveSection] = useState('rozgrywki');
   const [rooms, setRooms] = useState<any[]>([]);
   const [connStatus, setConnStatus] = useState('Brak połączenia');
@@ -121,7 +122,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ userData, client, onStartGame
       ) : activeSection === 'liderzy' ? (
         <LeadersScreen userData={userData}/>
       ) : activeSection === 'ustawienia' ? (
-        <Settings userData={userData}/>
+        <Settings userData={userData} onUserDataRefresh={onUserDataRefresh}/>
       ) : (
 
 

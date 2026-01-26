@@ -29,6 +29,29 @@ type PlayerInputSchema = {
     jump: boolean;
 };
 
+type ControlBindings = {
+    left: string;
+    right: string;
+    jump: string;
+    crouch: string;
+    crawl: string;
+    reload: string;
+    nade: string;
+};
+
+const DEFAULT_CONTROLS: ControlBindings = {
+    left: "A",
+    right: "D",
+    jump: "SPACE",
+    crouch: "CTRL",
+    crawl: "C",
+    reload: "R",
+    nade: "G"
+};
+
+const CONTROL_STORAGE_KEY = "controls";
+const SOUND_VOLUME_KEY = "soundVolume";
+
 type PlayerSchema = {
     id: string;
     name: string;
@@ -83,7 +106,10 @@ export class Game {
     private boundHandleMouseUp: (event: PointerEvent) => void;
     private boundHandleMouseWheel: (event: WheelEvent) => void;
     private boundHandleCrosshairColorChange: (event: Event) => void;
+    private boundHandleControlsChange: (event: Event) => void;
+    private boundHandleAudioSettingsChange: (event: Event) => void;
     private crosshairColor: string = "#ffffff";
+    private controls: ControlBindings = { ...DEFAULT_CONTROLS };
     private shootingInterval: NodeJS.Timeout | null = null;
     private fireRate: number = 1000; // domyślny czas między strzałami
     private jetpackEnergy: number = 100;
@@ -109,9 +135,12 @@ export class Game {
         this.boundHandleMouseUp = this.handleMouseUp.bind(this);
         this.boundHandleMouseWheel = this.handleMouseWheel.bind(this);
         this.boundHandleCrosshairColorChange = this.handleCrosshairColorChange.bind(this);
+        this.boundHandleControlsChange = this.handleControlsChange.bind(this);
+        this.boundHandleAudioSettingsChange = this.handleAudioSettingsChange.bind(this);
         this.room = room;
         this.onHudUpdate = onHudUpdate;
         this.crosshairColor = this.getStoredCrosshairColor();
+        this.controls = this.getStoredControls();
         this.room.onMessage("all_available_weapons", (weapons: Record<number, Weapon>) => {
             this.allWeapons = weapons;
             console.log("all_available_weapons received", this.allWeapons);
@@ -228,9 +257,9 @@ export class Game {
             if (!this.player._armatureDisplay) return;
             // 1. Input
             const input = {
-                left: keysPressed['a'] || false,
-                right: keysPressed['d'] || false,
-                jump: keysPressed['w'] || false
+                left: this.isControlPressed(this.controls.left),
+                right: this.isControlPressed(this.controls.right),
+                jump: this.isControlPressed(this.controls.jump)
             };
             this.latestInput = input;
             // 2. Wyślij do serwera
@@ -540,6 +569,92 @@ export class Game {
                 }
             }
         });
+    }
+
+    private getStoredControls(): ControlBindings {
+        if (typeof window === "undefined") return { ...DEFAULT_CONTROLS };
+        try {
+            const stored = localStorage.getItem(CONTROL_STORAGE_KEY);
+            if (!stored) return { ...DEFAULT_CONTROLS };
+            const parsed = JSON.parse(stored) as Partial<ControlBindings>;
+            const normalized = this.normalizeControls(parsed);
+            return { ...DEFAULT_CONTROLS, ...normalized };
+        } catch (err) {
+            return { ...DEFAULT_CONTROLS };
+        }
+    }
+
+    private getStoredPercent(key: string, fallback: number): number {
+        if (typeof window === "undefined") return fallback;
+        const raw = localStorage.getItem(key);
+        const value = raw ? Number(raw) : NaN;
+        if (!Number.isFinite(value)) return fallback;
+        return Math.min(100, Math.max(0, value));
+    }
+
+    private getStoredSoundVolume(): number {
+        const percent = this.getStoredPercent(SOUND_VOLUME_KEY, 60);
+        return percent / 100;
+    }
+
+    private normalizeKeyLabel(value: string): string {
+        if (value === " ") return "SPACE";
+        const trimmed = value.trim();
+        if (!trimmed) return "";
+        const upper = trimmed.toUpperCase();
+
+        if (upper === "SPACE" || upper === "SPACEBAR") return "SPACE";
+        if (upper === "CTRL" || upper === "CONTROL") return "CTRL";
+        if (upper === "SHIFT") return "SHIFT";
+        if (upper === "ALT") return "ALT";
+        if (upper === "ARROWLEFT" || upper === "LEFT") return "LEFT";
+        if (upper === "ARROWRIGHT" || upper === "RIGHT") return "RIGHT";
+        if (upper === "ARROWUP" || upper === "UP") return "UP";
+        if (upper === "ARROWDOWN" || upper === "DOWN") return "DOWN";
+        if (upper === "ESCAPE" || upper === "ESC") return "ESC";
+        if (upper === "ENTER" || upper === "RETURN") return "ENTER";
+        if (upper === "TAB") return "TAB";
+        if (upper === "BACKSPACE") return "BACKSPACE";
+        if (upper === "DELETE" || upper === "DEL") return "DELETE";
+
+        if (upper.length === 1) return upper;
+        return upper;
+    }
+
+    private normalizeControls(input: Partial<ControlBindings>): Partial<ControlBindings> {
+        const normalized: Partial<ControlBindings> = {};
+        (Object.keys(DEFAULT_CONTROLS) as Array<keyof ControlBindings>).forEach((key) => {
+            const value = input[key];
+            if (typeof value === "string") {
+                const label = this.normalizeKeyLabel(value);
+                if (label) {
+                    normalized[key] = label;
+                }
+            }
+        });
+        return normalized;
+    }
+
+    private handleControlsChange(event: Event) {
+        const detail = (event as CustomEvent).detail as Partial<ControlBindings> | undefined;
+        if (!detail) return;
+        const normalized = this.normalizeControls(detail);
+        this.controls = { ...this.controls, ...normalized };
+    }
+
+    private handleAudioSettingsChange(event: Event) {
+        const detail = (event as CustomEvent).detail as { sound?: number; music?: number } | undefined;
+        if (!detail) return;
+        if (detail.sound !== undefined && this.shootSound) {
+            const clamped = Math.min(100, Math.max(0, detail.sound));
+            this.shootSound.volume = clamped / 100;
+        }
+    }
+
+    private isControlPressed(key: string): boolean {
+        const normalized = this.normalizeKeyLabel(key);
+        if (!normalized) return false;
+        return !!keysPressed[normalized];
     }
 
     private getStoredCrosshairColor(): string {
@@ -865,7 +980,7 @@ export class Game {
         this.mouseY = 0;
         this.bullets = [];
         this.shootSound = new Audio('/snd_weapon_64.mp3');
-        this.shootSound.volume = 0.05;
+        this.shootSound.volume = this.getStoredSoundVolume();
         this.setupEventListeners();
     }
 
@@ -986,14 +1101,20 @@ export class Game {
         document.addEventListener('pointerup', this.boundHandleMouseUp);
         document.addEventListener('wheel', this.boundHandleMouseWheel);
         window.addEventListener('crosshair-color-changed', this.boundHandleCrosshairColorChange);
+        window.addEventListener('controls-changed', this.boundHandleControlsChange);
+        window.addEventListener('audio-settings-changed', this.boundHandleAudioSettingsChange);
     }
 
     private handleKeyDown(event: KeyboardEvent) {
-        keysPressed[event.key] = true;
+        const normalized = this.normalizeKeyLabel(event.key);
+        if (!normalized) return;
+        keysPressed[normalized] = true;
     }
 
     private handleKeyUp(event: KeyboardEvent) {
-        keysPressed[event.key] = false;
+        const normalized = this.normalizeKeyLabel(event.key);
+        if (!normalized) return;
+        keysPressed[normalized] = false;
     }
 
     private isPlayerOnGround(): boolean {
@@ -1019,6 +1140,8 @@ export class Game {
         document.removeEventListener('pointerup', this.boundHandleMouseUp);
         document.removeEventListener('wheel', this.boundHandleMouseWheel);
         window.removeEventListener('crosshair-color-changed', this.boundHandleCrosshairColorChange);
+        window.removeEventListener('controls-changed', this.boundHandleControlsChange);
+        window.removeEventListener('audio-settings-changed', this.boundHandleAudioSettingsChange);
         if (this.shootingInterval) {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;

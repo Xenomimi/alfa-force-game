@@ -1,4 +1,5 @@
 import express from "express";
+import bcrypt from "bcrypt";
 import { prisma } from "../index";
 import { verifyToken } from "../middleware/verifyToken";
 import { LevelSystem } from "../game/levelSystem";
@@ -113,6 +114,91 @@ router.post("/assign-skill", verifyToken, async (req, res) => {
     } catch (err) {
         console.error("Błąd przy przypisywaniu punktu:", err);
         res.status(500).json({ error: "Błąd serwera przy przypisywaniu punktu" });
+    }
+});
+
+router.post("/account", verifyToken, async (req, res) => {
+    try {
+        const userId = (req as any).userId as number;
+        const { username, email, currentPassword, newPassword } = req.body as {
+            username?: string;
+            email?: string;
+            currentPassword?: string;
+            newPassword?: string;
+        };
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { profile: true }
+        });
+
+        if (!user || !user.profile) {
+            return res.status(404).json({ error: "Nie znaleziono profilu" });
+        }
+
+        const updates: Record<string, any> = {};
+        let renameCost = 0;
+
+        const trimmedUsername = typeof username === "string" ? username.trim() : "";
+        const trimmedEmail = typeof email === "string" ? email.trim() : "";
+
+        if (trimmedUsername && trimmedUsername !== user.username) {
+            const existing = await prisma.user.findUnique({ where: { username: trimmedUsername } });
+            if (existing) {
+                return res.status(400).json({ error: "Nazwa uzytkownika jest juz zajeta" });
+            }
+            if (user.profile.cash < 5) {
+                return res.status(400).json({ error: "Brak wystarczajacego cashu na zmiane nazwy" });
+            }
+            updates.username = trimmedUsername;
+            renameCost = 5;
+        }
+
+        if (trimmedEmail && trimmedEmail !== user.email) {
+            const existingEmail = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+            if (existingEmail) {
+                return res.status(400).json({ error: "Email jest juz zajety" });
+            }
+            updates.email = trimmedEmail;
+        }
+
+        if (newPassword && newPassword.length > 0) {
+            if (!currentPassword) {
+                return res.status(400).json({ error: "Wymagane aktualne haslo" });
+            }
+            const match = await bcrypt.compare(currentPassword, user.password);
+            if (!match) {
+                return res.status(400).json({ error: "Niepoprawne aktualne haslo" });
+            }
+            const hashed = await bcrypt.hash(newPassword, 10);
+            updates.password = hashed;
+        }
+
+        if (Object.keys(updates).length === 0 && renameCost === 0) {
+            return res.status(400).json({ error: "Brak zmian do zapisania" });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: {
+                ...updates,
+                ...(renameCost > 0 ? { profile: { update: { cash: { decrement: renameCost } } } } : {})
+            },
+            include: { profile: true }
+        });
+
+        res.json({
+            success: true,
+            user: {
+                id: updatedUser.id,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                profile: updatedUser.profile
+            }
+        });
+    } catch (err) {
+        console.error("Blad przy aktualizacji konta:", err);
+        res.status(500).json({ error: "Blad serwera przy aktualizacji konta" });
     }
 });
 

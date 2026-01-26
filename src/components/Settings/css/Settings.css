@@ -92,6 +92,22 @@
   gap:14px;
   justify-content:flex-end;
 }
+.settings-status{
+  margin-top:8px;
+  padding:8px 10px;
+  border-radius:6px;
+  font-size:13px;
+  background:var(--bg-dark-tertiary);
+  border:1px solid var(--border-color);
+}
+.settings-status.error{
+  color:#ff6b6b;
+  border-color:#b44;
+}
+.settings-status.success{
+  color:#39FF14;
+  border-color:#2b8f3a;
+}
 .settings-btn{
   display:flex;
   align-items:center;
@@ -114,6 +130,10 @@
   color:#fff;
 }
 .settings-btn.reset:hover{ background:var(--accent-red-hover); }
+.settings-btn:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+}
 
 /* Scrollbar dla całego panelu */
 .settings-root::-webkit-scrollbar{ width:6px; }

@@ -26,6 +26,7 @@ export interface UserProfile {
 export interface User {
   id: number;
   username: string;
+  email: string;
   profile: UserProfile;
 }
 
@@ -161,6 +162,7 @@ const App: React.FC = () => {
                     setScreen('game');
                 }}
                 onLogout={handleLogout}
+                onUserDataRefresh={refreshUserData}
             />
         );
     }
