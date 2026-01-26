@@ -13,7 +13,10 @@ const Settings: React.FC<SettingsProps> = ({ userData }) => {
   const [email,       setEmail]       = useState('user@mail.com');
   const [soundVol,    setSoundVol]    = useState(60);
   const [musicVol,    setMusicVol]    = useState(50);
-  const [crosshair,   setCrosshair]   = useState('#ffffff');
+  const [crosshair,   setCrosshair]   = useState(() => {
+    if (typeof window === 'undefined') return '#ffffff';
+    return localStorage.getItem('crosshairColor') || '#ffffff';
+  });
   const [controls,    setControls]    = useState({
     left:  'A',   right: 'D',   jump: 'Space',
     crouch:'Ctrl',crawl: 'C',   reload:'R',   nade:'G',
@@ -23,9 +26,17 @@ const Settings: React.FC<SettingsProps> = ({ userData }) => {
   const handleKeyChange = (key: keyof typeof controls, value:string) =>
     setControls(prev => ({ ...prev, [key]: value.toUpperCase() }));
 
+  const setCrosshairValue = (value: string) => {
+    setCrosshair(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('crosshairColor', value);
+      window.dispatchEvent(new CustomEvent('crosshair-color-changed', { detail: value }));
+    }
+  };
+
   const resetDefaults = () => {
     setSoundVol(60); setMusicVol(50);
-    setCrosshair('#ffffff');
+    setCrosshairValue('#ffffff');
     setControls({ left:'A', right:'D', jump:'Space',
                   crouch:'Ctrl', crawl:'C', reload:'R', nade:'G' });
   };
@@ -83,7 +94,7 @@ const Settings: React.FC<SettingsProps> = ({ userData }) => {
         <div className="crosshair-row">
           <span>Celownik</span>
           <input type="color" value={crosshair}
-                 onChange={e=>setCrosshair(e.target.value)} />
+                 onChange={e=>setCrosshairValue(e.target.value)} />
         </div>
       </section>
 

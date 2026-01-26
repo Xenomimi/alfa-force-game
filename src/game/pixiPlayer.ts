@@ -280,11 +280,16 @@ export class Player {
     }
 
     private getSpreadRadius(): number {
-        const maxRadius = 50;
+        const maxRadius = 18;
         const minRadius = 4;
         const clamped = Math.max(0, Math.min(this.accuracy, 50));
         const t = clamped / 50;
-        return maxRadius - (maxRadius - minRadius) * t;
+        const baseRadius = maxRadius - (maxRadius - minRadius) * t;
+        const distance = Math.max(1, Math.hypot(this.dx, this.dy));
+        const maxDistance = 900;
+        const distanceT = Math.min(1, distance / maxDistance);
+        const distancePenalty = 12 * distanceT;
+        return baseRadius + distancePenalty;
     }
 
     private getRandomSpreadOffset(radius: number): { x: number; y: number } {
@@ -578,6 +583,7 @@ export class Player {
 //         this.container.addChild(text);
 //     }
 }
+
 
 
 

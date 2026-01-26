@@ -82,6 +82,8 @@ export class Game {
     private boundHandleMouseDown: (event: PointerEvent) => void;
     private boundHandleMouseUp: (event: PointerEvent) => void;
     private boundHandleMouseWheel: (event: WheelEvent) => void;
+    private boundHandleCrosshairColorChange: (event: Event) => void;
+    private crosshairColor: string = "#ffffff";
     private shootingInterval: NodeJS.Timeout | null = null;
     private fireRate: number = 1000; // domyślny czas między strzałami
     private jetpackEnergy: number = 100;
@@ -106,8 +108,10 @@ export class Game {
         this.boundHandleMouseDown = this.handleMouseDown.bind(this);
         this.boundHandleMouseUp = this.handleMouseUp.bind(this);
         this.boundHandleMouseWheel = this.handleMouseWheel.bind(this);
+        this.boundHandleCrosshairColorChange = this.handleCrosshairColorChange.bind(this);
         this.room = room;
         this.onHudUpdate = onHudUpdate;
+        this.crosshairColor = this.getStoredCrosshairColor();
         this.room.onMessage("all_available_weapons", (weapons: Record<number, Weapon>) => {
             this.allWeapons = weapons;
             console.log("all_available_weapons received", this.allWeapons);
@@ -538,13 +542,44 @@ export class Game {
         });
     }
 
-    private getCrosshairRadius(): number {
-        const maxRadius = 50;
+    private getStoredCrosshairColor(): string {
+        if (typeof window === "undefined") return "#ffffff";
+        const stored = localStorage.getItem("crosshairColor");
+        return stored && stored.trim().length > 0 ? stored : "#ffffff";
+    }
+
+    private handleCrosshairColorChange(event: Event) {
+        const detail = (event as CustomEvent).detail;
+        if (typeof detail === "string") {
+            this.crosshairColor = detail;
+        }
+    }
+
+    private parseCrosshairColor(color: string): number {
+        const cleaned = color.replace("#", "").trim();
+        if (cleaned.length === 3) {
+            const expanded = cleaned.split("").map(c => c + c).join("");
+            const parsed = Number.parseInt(expanded, 16);
+            return Number.isNaN(parsed) ? 0xffffff : parsed;
+        }
+        if (cleaned.length === 6) {
+            const parsed = Number.parseInt(cleaned, 16);
+            return Number.isNaN(parsed) ? 0xffffff : parsed;
+        }
+        return 0xffffff;
+    }
+
+    private getCrosshairRadius(distance: number): number {
+        const maxRadius = 18;
         const minRadius = 4;
         const accuracy = this.player?.accuracy ?? 0;
         const clamped = Math.max(0, Math.min(accuracy, 50));
         const t = clamped / 50;
-        return maxRadius - (maxRadius - minRadius) * t;
+        const baseRadius = maxRadius - (maxRadius - minRadius) * t;
+        const maxDistance = 1500;
+        const distanceT = Math.min(1, distance / maxDistance);
+        const distancePenalty = 12 * distanceT;
+        return baseRadius + distancePenalty;
     }
     
     
@@ -869,9 +904,20 @@ export class Game {
             let mousePosition = this.viewport.toLocal(global);
             this.mouseX = mousePosition.x;
             this.mouseY = mousePosition.y;
-            const radius = this.getCrosshairRadius();
+            const playerX = this.player?.x ?? mousePosition.x;
+            const playerY = this.player?.y ?? mousePosition.y;
+            const distance = Math.hypot(mousePosition.x - playerX, mousePosition.y - playerY);
+            const maxDistance = 1500;
+            const distanceT = Math.min(1, distance / maxDistance);
+            const radius = this.getCrosshairRadius(distance);
+            const length = 16 + distanceT * 12;
+            const thickness = 5;
+            const color = this.parseCrosshairColor(this.crosshairColor);
             circle.clear();
-            circle.circle(0, 0, radius).fill({ color: 0xffffff, alpha: 0.9 }).stroke({ color: 0x111111, alpha: 0.87, width: 1 });
+            circle.rect(-thickness / 2, -(radius + length), thickness, length).fill({ color, alpha: 0.9 });
+            circle.rect(-thickness / 2, radius, thickness, length).fill({ color, alpha: 0.9 });
+            circle.rect(-(radius + length), -thickness / 2, length, thickness).fill({ color, alpha: 0.9 });
+            circle.rect(radius, -thickness / 2, length, thickness).fill({ color, alpha: 0.9 });
             circle.position.copyFrom(mousePosition);
         });
     }
@@ -938,7 +984,8 @@ export class Game {
         document.addEventListener('keyup', this.boundHandleKeyUp);
         document.addEventListener('pointerdown', this.boundHandleMouseDown);
         document.addEventListener('pointerup', this.boundHandleMouseUp);
-        document.addEventListener('wheel', this.boundHandleMouseWheel);     
+        document.addEventListener('wheel', this.boundHandleMouseWheel);
+        window.addEventListener('crosshair-color-changed', this.boundHandleCrosshairColorChange);
     }
 
     private handleKeyDown(event: KeyboardEvent) {
@@ -971,6 +1018,7 @@ export class Game {
         document.removeEventListener('pointerdown', this.boundHandleMouseDown);
         document.removeEventListener('pointerup', this.boundHandleMouseUp);
         document.removeEventListener('wheel', this.boundHandleMouseWheel);
+        window.removeEventListener('crosshair-color-changed', this.boundHandleCrosshairColorChange);
         if (this.shootingInterval) {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;
