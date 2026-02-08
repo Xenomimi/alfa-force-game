@@ -10,7 +10,7 @@ export class Bullet extends Schema {
     @type("number") damage: number = 0;
 
     radius: number = 5;
-    speed: number = 30;
+    speed: number = 50;
     physicsWorld: Matter.World;
     bulletBody: Matter.Body;
 

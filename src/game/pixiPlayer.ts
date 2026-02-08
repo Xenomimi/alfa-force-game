@@ -42,7 +42,7 @@ export class Player {
     bottom: number;
     playerName: string = "Anon";
     playerWeaponId: number;
-    shootingPointOffsetX: number = 60;
+    shootingPointOffsetX: number = 100;
     speed: number;
     gravity: number;
     verticalSpeed: number;
@@ -258,7 +258,7 @@ export class Player {
             const tex: PIXI.Texture = PIXI.Assets.get(`weapon_${gunId}`);
             const newDisplay = new PIXI.Sprite(tex);
             
-            newDisplay.anchor.set(0.1, 0.4);
+            newDisplay.anchor.set(0.1, 0.6);
             newDisplay.scale.set(0.3);
             // Teksture musimy opakować w kontener po to żeby działało 
             // skalowanie romiaru broni
