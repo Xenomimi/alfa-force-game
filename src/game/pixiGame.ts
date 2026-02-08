@@ -11,7 +11,6 @@ import { Weapon } from "../server/game/weapons";
 import { HudState } from '../components/Game/GameComponent';
 import { MapSchema } from '@colyseus/schema';
 import { ScoreboardEntry } from '../components/Hud/GameHUD';
-import { LevelSystem } from "../server/game/levelSystem";
 
 const keysPressed: { [key: string]: boolean } = {};
 const otherPlayers: { [id: string]: Player } = {};
@@ -27,6 +26,25 @@ type PlayerInputSchema = {
     left: boolean;
     right: boolean;
     jump: boolean;
+};
+
+type GrenadePickupSchema = {
+    id: string;
+    x: number;
+    y: number;
+};
+
+type GrenadeProjectileSchema = {
+    id: string;
+    playerId: string;
+    x: number;
+    y: number;
+};
+
+type GrenadeExplosionPayload = {
+    x: number;
+    y: number;
+    radius: number;
 };
 
 type ControlBindings = {
@@ -67,11 +85,24 @@ type PlayerSchema = {
     lastInputTick: number;
     currentWeaponId: number;
     ammo: number;
+    grenades: number;
     jetpackEnergy: number;
     maxJetpackEnergy: number;
     accuracy: number;
     reloadingWeapons: MapSchema<boolean>;
     input: PlayerInputSchema;
+};
+
+type GrenadePickupDisplay = {
+    container: PIXI.Container;
+    baseY: number;
+    phaseOffset: number;
+};
+
+type GrenadeProjectileDisplay = {
+    container: PIXI.Container;
+    icon: PIXI.Sprite;
+    spinSpeed: number;
 };
 
 export class Game {
@@ -127,6 +158,10 @@ export class Game {
     private serverPosition: any = { x: 1000, y: 300, dx: 0, dy: 0 };
     private serverTick: number = 0;
     private onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void;
+    private grenadeThrowHeld = false;
+    private grenadePickupDisplays: Map<string, GrenadePickupDisplay> = new Map();
+    private grenadeProjectileDisplays: Map<string, GrenadeProjectileDisplay> = new Map();
+    private grenadeExplosionFrames: PIXI.Texture[] = [];
 
     constructor(containerElement: HTMLDivElement, room: Room<any>, onHudUpdate?: (data: Partial<HudState>, scoreboard?: ScoreboardEntry[]) => void) {
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
@@ -185,6 +220,9 @@ export class Game {
 
                 this.onHudUpdate(updates);
             }
+        });
+        this.room.onMessage("grenade_explosion", (payload: GrenadeExplosionPayload) => {
+            this.playGrenadeExplosion(payload);
         });
 
         // this.room.onMessage("weapon_switched", (newWeaponId: number) => {
@@ -262,6 +300,12 @@ export class Game {
                 jump: this.isControlPressed(this.controls.jump)
             };
             this.latestInput = input;
+            const throwGrenadePressed = this.isControlPressed(this.controls.nade);
+            if (throwGrenadePressed && !this.grenadeThrowHeld && this.player.isAlive) {
+                const aimAngle = Math.atan2(this.mouseY - this.player.y, this.mouseX - this.player.x);
+                this.room?.send("throw_grenade", { angle: aimAngle });
+            }
+            this.grenadeThrowHeld = throwGrenadePressed;
             // 2. Wyślij do serwera
             this.inputSequence++;
             this.room?.send("input", {
@@ -308,6 +352,7 @@ export class Game {
             this.camera.setMouse(this.mouseX, this.mouseY);
             this.camera.update(this.app.ticker.deltaMS / 1000);
             this.updateBullets();
+            this.updateGrenadeVisuals(this.app.ticker.deltaMS / 1000);
         });
     }
 
@@ -321,20 +366,22 @@ export class Game {
             
             console.log("Player added:", sessionId, this.room!.sessionId);
 
-            if (this.onHudUpdate) {
-                this.onHudUpdate({ 
-                    weaponId: player.currentWeaponId,
-                    kills: player.kills,
-                    deaths: player.deaths,
-                    ammo: player.ammo,
-                    maxAmmo: this.allWeapons[this.userWeapons[0]].amunition,
-                    health: player.maxHealth,
-                    maxHealth: player.maxHealth,
-                    jetpackEnergy: player.jetpackEnergy,
-                    maxJetpackEnergy: player.maxJetpackEnergy,
-                 });
-            }
             if (sessionId === this.room!.sessionId) {
+                if (this.onHudUpdate) {
+                    const currentWeaponStats = this.allWeapons[player.currentWeaponId];
+                    this.onHudUpdate({
+                        weaponId: player.currentWeaponId,
+                        kills: player.kills,
+                        deaths: player.deaths,
+                        ammo: player.ammo,
+                        maxAmmo: currentWeaponStats?.amunition ?? player.ammo,
+                        grenades: player.grenades,
+                        health: player.health,
+                        maxHealth: player.maxHealth,
+                        jetpackEnergy: player.jetpackEnergy,
+                        maxJetpackEnergy: player.maxJetpackEnergy,
+                    });
+                }
                 this.player.playerName = player.name || "Anon";
                 this.player.drawPlayerName();
                 if (player.accuracy !== undefined) {
@@ -356,6 +403,9 @@ export class Game {
                     if (player.ammo !== undefined) {
                         this.player.ammo = player.ammo; // synchronizacja lokalna
                         updates.ammo = player.ammo;  // do HUD
+                    }
+                    if (player.grenades !== undefined) {
+                        updates.grenades = player.grenades;
                     }
 
                     if (player.health !== undefined) updates.health = player.health;
@@ -443,7 +493,7 @@ export class Game {
             }
         });
 
-        this.roomCallBacks(this.room!.state).playerEntities.onRemove((player: any, sessionId: string) => {
+        this.roomCallBacks(this.room!.state).playerEntities.onRemove((_player: any, sessionId: string) => {
             this.broadcastScoreboard();
             if (otherPlayers[sessionId]) {
                 // Usuń gracza z kontenera i świata fizyki
@@ -486,9 +536,40 @@ export class Game {
             // }
         });
 
-        this.roomCallBacks(this.room!.state).bulletEntities.onRemove((bullet: any, bulletId: string) => {
+        this.roomCallBacks(this.room!.state).bulletEntities.onRemove((_bullet: any, bulletId: string) => {
             // Usuń pocisk z lokalnej tablicy i świata fizyki
             console.log("Bullet removed:", bulletId);
+        });
+
+        this.roomCallBacks(this.room!.state).grenadePickups.onAdd((pickup: GrenadePickupSchema, pickupId: string) => {
+            const display = this.createGrenadePickupDisplay(pickupId, pickup.x, pickup.y);
+            this.grenadePickupDisplays.set(pickupId, display);
+
+            this.roomCallBacks(pickup).onChange(() => {
+                const currentDisplay = this.grenadePickupDisplays.get(pickupId);
+                if (!currentDisplay) return;
+                currentDisplay.container.x = pickup.x;
+                currentDisplay.baseY = pickup.y;
+            });
+        });
+
+        this.roomCallBacks(this.room!.state).grenadePickups.onRemove((_pickup: GrenadePickupSchema, pickupId: string) => {
+            this.removeGrenadePickupDisplay(pickupId);
+        });
+
+        this.roomCallBacks(this.room!.state).grenadeProjectiles.onAdd((grenade: GrenadeProjectileSchema, grenadeId: string) => {
+            const display = this.createGrenadeProjectileDisplay(grenade.x, grenade.y);
+            this.grenadeProjectileDisplays.set(grenadeId, display);
+
+            this.roomCallBacks(grenade).onChange(() => {
+                const currentDisplay = this.grenadeProjectileDisplays.get(grenadeId);
+                if (!currentDisplay) return;
+                currentDisplay.container.position.set(grenade.x, grenade.y);
+            });
+        });
+
+        this.roomCallBacks(this.room!.state).grenadeProjectiles.onRemove((_grenade: GrenadeProjectileSchema, grenadeId: string) => {
+            this.removeGrenadeProjectileDisplay(grenadeId);
         });
     }
 
@@ -569,6 +650,184 @@ export class Game {
                 }
             }
         });
+    }
+
+    private getDeterministicPhase(input: string): number {
+        let hash = 0;
+        for (let i = 0; i < input.length; i++) {
+            hash = (hash << 5) - hash + input.charCodeAt(i);
+            hash |= 0;
+        }
+        const normalized = Math.abs(hash % 628);
+        return normalized / 100;
+    }
+
+    private createGrenadePickupDisplay(pickupId: string, x: number, y: number): GrenadePickupDisplay {
+        const container = new PIXI.Container();
+        container.position.set(x, y);
+
+        const pulse = new PIXI.Graphics();
+        pulse.circle(0, 0, 21).fill({ color: 0x99ff44, alpha: 0.18 });
+        pulse.circle(0, 0, 30).stroke({ width: 2, color: 0xd8ff8c, alpha: 0.38 });
+
+        const texture = (PIXI.Assets.get("grenade_pickup") as PIXI.Texture | undefined) ?? PIXI.Texture.WHITE;
+        const icon = new PIXI.Sprite(texture);
+        icon.anchor.set(0.5);
+
+        if (texture === PIXI.Texture.WHITE) {
+            icon.width = 24;
+            icon.height = 24;
+            icon.tint = 0x68ff4a;
+        } else {
+            icon.scale.set(0.22);
+        }
+
+        container.addChild(pulse);
+        container.addChild(icon);
+        this.gameContainer.addChild(container);
+
+        return {
+            container,
+            baseY: y,
+            phaseOffset: this.getDeterministicPhase(pickupId)
+        };
+    }
+
+    private removeGrenadePickupDisplay(pickupId: string) {
+        const display = this.grenadePickupDisplays.get(pickupId);
+        if (!display) return;
+        display.container.removeFromParent();
+        display.container.destroy({ children: true });
+        this.grenadePickupDisplays.delete(pickupId);
+    }
+
+    private createGrenadeProjectileDisplay(x: number, y: number): GrenadeProjectileDisplay {
+        const container = new PIXI.Container();
+        container.position.set(x, y);
+
+        const shadow = new PIXI.Graphics();
+        shadow.ellipse(0, 13, 10, 4).fill({ color: 0x000000, alpha: 0.22 });
+
+        const texture = (PIXI.Assets.get("grenade_projectile") as PIXI.Texture | undefined) ?? PIXI.Texture.WHITE;
+        const icon = new PIXI.Sprite(texture);
+        icon.anchor.set(0.5);
+
+        if (texture === PIXI.Texture.WHITE) {
+            icon.width = 16;
+            icon.height = 16;
+            icon.tint = 0x2c3f2a;
+        } else {
+            icon.scale.set(0.17);
+        }
+
+        container.addChild(shadow);
+        container.addChild(icon);
+        this.gameContainer.addChild(container);
+
+        return {
+            container,
+            icon,
+            spinSpeed: 4 + Math.random() * 2.2
+        };
+    }
+
+    private removeGrenadeProjectileDisplay(grenadeId: string) {
+        const display = this.grenadeProjectileDisplays.get(grenadeId);
+        if (!display) return;
+        display.container.removeFromParent();
+        display.container.destroy({ children: true });
+        this.grenadeProjectileDisplays.delete(grenadeId);
+    }
+
+    private updateGrenadeVisuals(deltaSeconds: number) {
+        const time = performance.now() / 1000;
+
+        for (const pickupDisplay of this.grenadePickupDisplays.values()) {
+            pickupDisplay.container.y = pickupDisplay.baseY + Math.sin(time * 3.1 + pickupDisplay.phaseOffset) * 6;
+            const pulseScale = 0.92 + (Math.sin(time * 5 + pickupDisplay.phaseOffset) + 1) * 0.06;
+            pickupDisplay.container.scale.set(pulseScale);
+        }
+
+        for (const grenadeDisplay of this.grenadeProjectileDisplays.values()) {
+            grenadeDisplay.icon.rotation += grenadeDisplay.spinSpeed * deltaSeconds;
+        }
+    }
+
+    private playGrenadeExplosion(payload: GrenadeExplosionPayload) {
+        if (!this.gameContainer) return;
+        const { x, y, radius } = payload;
+
+        const flash = new PIXI.Graphics();
+        flash.circle(0, 0, radius * 0.32).fill({ color: 0xfff1bc, alpha: 0.95 });
+        flash.circle(0, 0, radius * 0.58).fill({ color: 0xff9e2a, alpha: 0.4 });
+        flash.position.set(x, y);
+        flash.blendMode = 'add';
+        this.gameContainer.addChild(flash);
+
+        const flashStart = performance.now();
+        const flashDuration = 130;
+        const animateFlash = () => {
+            const elapsed = performance.now() - flashStart;
+            const t = Math.min(1, elapsed / flashDuration);
+            flash.alpha = 1 - t;
+            flash.scale.set(0.9 + t * 0.6);
+            if (t >= 1) {
+                flash.removeFromParent();
+                flash.destroy();
+                return;
+            }
+            requestAnimationFrame(animateFlash);
+        };
+        requestAnimationFrame(animateFlash);
+
+        if (this.grenadeExplosionFrames.length === 0) {
+            const ring = new PIXI.Graphics();
+            ring.circle(0, 0, 4).stroke({ width: 7, color: 0xff7e1f, alpha: 0.95 });
+            ring.position.set(x, y);
+            ring.blendMode = 'add';
+            this.gameContainer.addChild(ring);
+
+            const ringStart = performance.now();
+            const ringDuration = 240;
+            const animateRing = () => {
+                const elapsed = performance.now() - ringStart;
+                const t = Math.min(1, elapsed / ringDuration);
+                ring.scale.set(0.2 + t * (radius / 32));
+                ring.alpha = 1 - t;
+                if (t >= 1) {
+                    ring.removeFromParent();
+                    ring.destroy();
+                    return;
+                }
+                requestAnimationFrame(animateRing);
+            };
+            requestAnimationFrame(animateRing);
+            return;
+        }
+
+        const explosion = new PIXI.AnimatedSprite(this.grenadeExplosionFrames);
+        explosion.anchor.set(0.5);
+        explosion.position.set(x, y);
+        explosion.loop = false;
+        explosion.animationSpeed = 0.5;
+        explosion.blendMode = 'add';
+        const frameSize = Math.max(explosion.texture.width, explosion.texture.height, 1);
+        explosion.scale.set((radius * 2) / frameSize);
+        explosion.onComplete = () => {
+            explosion.removeFromParent();
+            explosion.destroy();
+        };
+        this.gameContainer.addChild(explosion);
+        explosion.play();
+    }
+
+    private clearGrenadeVisuals() {
+        for (const pickupId of Array.from(this.grenadePickupDisplays.keys())) {
+            this.removeGrenadePickupDisplay(pickupId);
+        }
+        for (const grenadeId of Array.from(this.grenadeProjectileDisplays.keys())) {
+            this.removeGrenadeProjectileDisplay(grenadeId);
+        }
     }
 
     private getStoredControls(): ControlBindings {
@@ -981,7 +1240,6 @@ export class Game {
         this.bullets = [];
         this.shootSound = new Audio('/snd_weapon_64.mp3');
         this.shootSound.volume = this.getStoredSoundVolume();
-        this.setupEventListeners();
     }
 
     private async loadAssets(weapons: Record<number, Weapon>) {
@@ -990,6 +1248,19 @@ export class Game {
             { alias: "foreground", src: "./foreground.png" },
         ];
 
+        const grenadeAssets = [
+            { alias: "grenade_pickup", src: "/effects/grenade-pickup.svg" },
+            { alias: "grenade_projectile", src: "/effects/grenade-projectile.svg" },
+        ];
+
+        const explosionFrameAssets = Array.from({ length: 25 }, (_, index) => {
+            const frameNumber = String(index + 1).padStart(2, "0");
+            return {
+                alias: `grenade_explosion_frame_${frameNumber}`,
+                src: `/effects/explosion/00${frameNumber}.png`
+            };
+        });
+
         const weaponAssets = Object.values(weapons).map(weapon => {
             return {
                 alias: `weapon_${weapon.id}`,
@@ -997,11 +1268,14 @@ export class Game {
             };
         });
 
-        const allAssets = [...baseAssets, ...weaponAssets];
+        const allAssets = [...baseAssets, ...grenadeAssets, ...explosionFrameAssets, ...weaponAssets];
 
         console.log("Loading assets:", allAssets);
 
         await PIXI.Assets.load(allAssets);
+        this.grenadeExplosionFrames = explosionFrameAssets
+            .map((asset) => PIXI.Assets.get(asset.alias) as PIXI.Texture | undefined)
+            .filter((texture): texture is PIXI.Texture => texture !== undefined);
 
         // this.player.loadTextures();
         // for (let id in otherPlayers) {
@@ -1146,11 +1420,13 @@ export class Game {
             clearInterval(this.shootingInterval);
             this.shootingInterval = null;
         }
+        this.grenadeThrowHeld = false;
     }
 
     async stop() {
         this.app.ticker.stop();
         this.removeEventListeners();
+        this.clearGrenadeVisuals();
         this.app.stop();
         this.app.destroy(true);
     }

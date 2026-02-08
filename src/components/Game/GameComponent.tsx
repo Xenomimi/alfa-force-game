@@ -14,6 +14,7 @@ export interface HudState {
     deaths: number;
     ammo: number;
     maxAmmo: number;
+    grenades: number;
     health: number;
     maxHealth: number;
     level: number;
@@ -62,6 +63,7 @@ const GameComponent: React.FC<GameProps> = ({ userData, gameRoom, handleExit }) 
         deaths: 0,
         ammo: 0,
         maxAmmo: 0,
+        grenades: 0,
         health: 0,
         maxHealth: 0,
         level: profile?.level || 1,

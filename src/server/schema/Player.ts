@@ -29,6 +29,7 @@ export class Player extends Schema {
   // Broń
   @type("number") currentWeaponId: number = 1;
   @type("number") ammo: number = 30;
+  @type("number") grenades: number = 0;
   @type({ map: "boolean" }) reloadingWeapons = new MapSchema<boolean>();
   @type("number") accuracy: number = 0;
 

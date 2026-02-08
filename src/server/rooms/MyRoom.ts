@@ -2,6 +2,8 @@ import { Room, Client, AuthContext } from "@colyseus/core";
 import { nanoid } from "nanoid";
 import { Player } from "../schema/Player";
 import { Bullet } from "../schema/Bullet";
+import { GrenadePickup } from "../schema/GrenadePickup";
+import { GrenadeProjectile } from "../schema/GrenadeProjectile";
 import { MyRoomState } from "../schema/MyRoomState";
 import mapData from "../../assets/map3_data.json";
 import Matter from 'matter-js';
@@ -72,11 +74,22 @@ export class MyRoom extends Room<MyRoomState> {
     private world: Matter.World;
     private playerBodies: Map<string, Matter.Body> = new Map();
     private bulletBodies: Map<string, Matter.Body> = new Map();
+    private grenadeBodies: Map<string, Matter.Body> = new Map();
     private moveSpeed = 15;
     private jetpackThrust = -20;
     private jetpackMaxEnergy = 100;
     private jetpackDrainPerSecond = 35;
     private jetpackRechargePerSecond = 20;
+    private grenadeSpawnIntervalMs = 9000;
+    private maxGroundGrenadePickups = 6;
+    private grenadePickupCollectRadius = 34;
+    private grenadeFuseMs = 1800;
+    private grenadeThrowSpeed = 34;
+    private grenadeExplosionRadius = 220;
+    private grenadeExplosionMaxDamage = 70;
+    private readonly mapScaleFactor = 3;
+    private readonly worldWidth = mapData.width * this.mapScaleFactor;
+    private readonly worldHeight = mapData.height * this.mapScaleFactor;
     private enlapsedTime = 0;
     private fixedTimeStep = 1000 / 60;
 
@@ -102,6 +115,7 @@ export class MyRoom extends Room<MyRoomState> {
         this.createMap();
         this.state = new MyRoomState();
         this.addMessageHandlers();
+        this.startGrenadeSpawner();
         console.log("🕹️  MyRoom created!", options);
     }
     
@@ -179,6 +193,7 @@ export class MyRoom extends Room<MyRoomState> {
         playerState.accuracy = auth.profile.stats.accuracy;
         playerState.maxJetpackEnergy = this.jetpackMaxEnergy;
         playerState.jetpackEnergy = this.jetpackMaxEnergy;
+        playerState.grenades = 0;
 
         const userInventory = auth.profile.inventory || [];
         const userWeaponIds = userInventory.map((item) => item.weaponId);
@@ -205,7 +220,68 @@ export class MyRoom extends Room<MyRoomState> {
  
     onLeave(client: Client, options: any) {
         this.state.playerEntities.delete(client.sessionId);
+        const body = this.playerBodies.get(client.sessionId);
+        if (body) {
+            Matter.Composite.remove(this.world, body);
+        }
         this.playerBodies.delete(client.sessionId);
+    }
+
+    private startGrenadeSpawner() {
+        this.clock.setInterval(() => {
+            this.spawnGrenadePickup();
+        }, this.grenadeSpawnIntervalMs);
+    }
+
+    private spawnGrenadePickup() {
+        if (this.state.grenadePickups.size >= this.maxGroundGrenadePickups) return;
+
+        const spawnPoint = this.findGrenadeSpawnPosition();
+        if (!spawnPoint) return;
+
+        const pickupId = nanoid();
+        const pickup = new GrenadePickup(pickupId, spawnPoint.x, spawnPoint.y);
+        this.state.grenadePickups.set(pickupId, pickup);
+    }
+
+    private findGrenadeSpawnPosition(): Point | null {
+        const margin = 220;
+
+        for (let i = 0; i < 40; i++) {
+            const x = margin + Math.random() * (this.worldWidth - margin * 2);
+            const y = margin + Math.random() * (this.worldHeight - margin * 2);
+            if (this.isValidGrenadeSpawnPoint(x, y)) {
+                return { x, y };
+            }
+        }
+
+        return null;
+    }
+
+    private isValidGrenadeSpawnPoint(x: number, y: number): boolean {
+        const point = { x, y };
+        const pointCollisions = Matter.Query.point(Matter.Composite.allBodies(this.world), point);
+        if (pointCollisions.some((body) => body.label === "wall")) {
+            return false;
+        }
+
+        let tooCloseToPickup = false;
+        this.state.grenadePickups.forEach((pickup) => {
+            if (Math.hypot(pickup.x - x, pickup.y - y) < 140) {
+                tooCloseToPickup = true;
+            }
+        });
+        if (tooCloseToPickup) return false;
+
+        let tooCloseToPlayer = false;
+        for (const body of this.playerBodies.values()) {
+            if (Math.hypot(body.position.x - x, body.position.y - y) < 180) {
+                tooCloseToPlayer = true;
+                break;
+            }
+        }
+
+        return !tooCloseToPlayer;
     }
 
     // --- LOGIKA GRY ---
@@ -443,6 +519,9 @@ export class MyRoom extends Room<MyRoomState> {
                 Matter.Body.setVelocity(body, velocity);
             }
         }
+
+        this.handleGrenadePickupCollection();
+
         for (const [bulletId, bulletBody] of this.bulletBodies.entries()) {
             const bulletState = this.state.bulletEntities.get(bulletId);
             if (bulletState) {
@@ -456,7 +535,86 @@ export class MyRoom extends Room<MyRoomState> {
                 this.state.bulletEntities.delete(bulletId);
             }
         }
+
+        for (const [grenadeId, grenadeBody] of this.grenadeBodies.entries()) {
+            const grenadeState = this.state.grenadeProjectiles.get(grenadeId);
+            if (!grenadeState) {
+                Matter.Composite.remove(this.world, grenadeBody);
+                this.grenadeBodies.delete(grenadeId);
+                continue;
+            }
+
+            grenadeState.x = grenadeBody.position.x;
+            grenadeState.y = grenadeBody.position.y;
+        }
+
         Matter.Engine.update(this.physicsEngine, deltaTime);
+    }
+
+    private handleGrenadePickupCollection() {
+        if (this.state.grenadePickups.size === 0) return;
+
+        const pickupsToCollect: Array<{ pickupId: string; collector: Player }> = [];
+
+        this.state.grenadePickups.forEach((pickup, pickupId) => {
+            for (const [sessionId, player] of this.state.playerEntities.entries()) {
+                if (!player.isAlive) continue;
+
+                const body = this.playerBodies.get(sessionId);
+                if (!body) continue;
+
+                const distance = Math.hypot(body.position.x - pickup.x, body.position.y - pickup.y);
+                if (distance <= this.grenadePickupCollectRadius) {
+                    pickupsToCollect.push({ pickupId, collector: player });
+                    break;
+                }
+            }
+        });
+
+        for (const entry of pickupsToCollect) {
+            if (!this.state.grenadePickups.has(entry.pickupId)) continue;
+            this.state.grenadePickups.delete(entry.pickupId);
+            entry.collector.grenades += 1;
+        }
+    }
+
+    private async explodeGrenade(grenadeId: string) {
+        const grenadeState = this.state.grenadeProjectiles.get(grenadeId);
+        const grenadeBody = this.grenadeBodies.get(grenadeId);
+        if (!grenadeState || !grenadeBody) return;
+
+        const centerX = grenadeBody.position.x;
+        const centerY = grenadeBody.position.y;
+        const ownerId = grenadeState.playerId;
+
+        Matter.Composite.remove(this.world, grenadeBody);
+        this.grenadeBodies.delete(grenadeId);
+        this.state.grenadeProjectiles.delete(grenadeId);
+
+        for (const [sessionId, player] of this.state.playerEntities.entries()) {
+            if (!player.isAlive) continue;
+
+            const body = this.playerBodies.get(sessionId);
+            if (!body) continue;
+
+            const distance = Math.hypot(body.position.x - centerX, body.position.y - centerY);
+            if (distance > this.grenadeExplosionRadius) continue;
+
+            const falloff = 1 - distance / this.grenadeExplosionRadius;
+            const damage = Math.max(10, Math.round(this.grenadeExplosionMaxDamage * falloff));
+            player.health -= damage;
+
+            if (player.health <= 0) {
+                player.health = 0;
+                await this.handlePlayerDeath(player, ownerId);
+            }
+        }
+
+        this.broadcast("grenade_explosion", {
+            x: centerX,
+            y: centerY,
+            radius: this.grenadeExplosionRadius
+        });
     }
 
     addMessageHandlers() {
@@ -516,6 +674,43 @@ export class MyRoom extends Room<MyRoomState> {
                 }    
             }
         );
+
+        this.onMessage("throw_grenade", (client, data) => {
+            const player = this.state.playerEntities.get(client.sessionId);
+            if (!player || !player.isAlive) return;
+            if (player.grenades <= 0) return;
+
+            const body = this.playerBodies.get(client.sessionId);
+            if (!body) return;
+
+            player.grenades -= 1;
+
+            const rawAngle = typeof data?.angle === "number" ? data.angle : 0;
+            const aimAngle = Number.isFinite(rawAngle) ? rawAngle : 0;
+            const spawnX = body.position.x + Math.cos(aimAngle) * 45;
+            const spawnY = body.position.y - 40 + Math.sin(aimAngle) * 45;
+
+            const grenadeId = nanoid();
+            const grenadeState = new GrenadeProjectile(
+                grenadeId,
+                player.id,
+                spawnX,
+                spawnY,
+                this.world
+            );
+
+            this.state.grenadeProjectiles.set(grenadeId, grenadeState);
+            this.grenadeBodies.set(grenadeId, grenadeState.grenadeBody);
+
+            Matter.Body.setVelocity(grenadeState.grenadeBody, {
+                x: Math.cos(aimAngle) * this.grenadeThrowSpeed + body.velocity.x * 0.35,
+                y: Math.sin(aimAngle) * this.grenadeThrowSpeed - 6
+            });
+
+            this.clock.setTimeout(() => {
+                void this.explodeGrenade(grenadeId);
+            }, this.grenadeFuseMs);
+        });
 
         this.onMessage("switch_weapon", (client, data) => {
             const player = this.state.playerEntities.get(client.sessionId);

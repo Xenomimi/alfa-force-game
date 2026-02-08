@@ -114,7 +114,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ userData, onGameExit, hudState, score
       {/* dolny HUD */}
         <div className="hud-bottom">
           <div className="hud-info-group">
-            <div className="hud-label">Granaty: 5</div>
+            <div className="hud-label">Granaty: {hudState.grenades}</div>
             <div className="hud-weapon hud-outline">
               {/* Dynamiczne ID broni */}
               <img src={`/weapons/${hudState.weaponId}.png`} alt="Broń" />
