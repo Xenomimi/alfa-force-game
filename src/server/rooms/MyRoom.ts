@@ -167,7 +167,7 @@ export class MyRoom extends Room<MyRoomState> {
         const startX = 1000;
         const startY = 300;
         const playerWidth = 36;
-        const playerHeight = 140;
+        const playerHeight = 154;
         const playerMatterBody = Matter.Bodies.rectangle(startX, startY, playerWidth, playerHeight, {
             label: 'player',
             inertia: Infinity,

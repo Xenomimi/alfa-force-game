@@ -258,7 +258,7 @@ export class Game {
             this.addCamera();
             this.setupEventListeners();
             this.createPointer(this.gameContainer);
-            // this.drawDebugBodies();
+            this.drawDebugBodies();
             this.setupFPSCounter();
         })();
     }

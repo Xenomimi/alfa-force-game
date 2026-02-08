@@ -96,7 +96,7 @@ export class Player {
         this.isAlive = true;
         this.id = id;
         this.width = 36;
-        this.height = 140;
+        this.height = 154;
         this.bottom = this.height / 2;
         this.x = x;
         this.y = y - this.bottom; 
@@ -126,6 +126,13 @@ export class Player {
         //     duration: 1000
         // };
         // this.deathTime = 100;
+
+        this.playerContainer = new PIXI.Container();
+        this.factory = PixiFactory.factory; 
+        this.jetpackParticleContainer = new PIXI.Container();
+        this.parentContainer.addChild(this.jetpackParticleContainer);
+        this.init(this.playerContainer);
+        this.parentContainer.addChild(this.playerContainer);
         this.playerMatterBody = Matter.Bodies.rectangle(this.x, this.y, this.width, this.height, {
             label: 'player',
             inertia: Infinity,
@@ -139,18 +146,10 @@ export class Player {
                 mask: 0xFFFF ^ 0x0002 // koliduje ze wszystkimi oprócz graczy
             }
         });
-        
+        this.playerMatterBody.ignoreGravity = gravity;
         Matter.Composite.add(psyhicsWorld, this.playerMatterBody);
 
-        this.playerMatterBody.ignoreGravity = gravity;
-        this.playerContainer = new PIXI.Container();
-        this.factory = PixiFactory.factory; 
 
-        this.jetpackParticleContainer = new PIXI.Container();
-        this.parentContainer.addChild(this.jetpackParticleContainer);
-
-        this.init(this.playerContainer);
-        this.parentContainer.addChild(this.playerContainer);
     }
 
     
@@ -162,9 +161,15 @@ export class Player {
 
         this._armatureDisplay = await PixiFactory.factory.buildArmatureDisplay("Armature")!;
         this._armature = await this._armatureDisplay.armature;
-        this._armatureDisplay.y = this.bottom;
+
         this._armatureDisplay.debugDraw = false;
         this._armatureDisplay.scale.set(2);
+        
+        this.width = this._armatureDisplay.width;
+        this.height = this._armatureDisplay.height;
+        this
+        this._armatureDisplay.y = this.bottom;
+
         this._armatureDisplay.animation.play("idle");
 
         playerContainer.addChild(this._armatureDisplay);
