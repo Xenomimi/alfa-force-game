@@ -31,6 +31,10 @@ export class Player extends Schema {
   @type("number") ammo: number = 30;
   @type("number") grenades: number = 0;
   @type({ map: "boolean" }) reloadingWeapons = new MapSchema<boolean>();
+  @type("number") armor: number = 0;
+  @type("number") strength: number = 0;
+  @type("number") agility: number = 0;
+  @type("number") intelligence: number = 0;
   @type("number") accuracy: number = 0;
 
   // Jetpack

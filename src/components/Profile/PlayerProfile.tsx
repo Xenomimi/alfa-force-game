@@ -10,6 +10,7 @@ import { UserData } from '../App.tsx';
 type WeaponStats = { min_damage: number; max_damage: number; amunition: number; reloadTime: number; fireInterval: number, accuracy: number };
 type ArtifactStats = { bonusType: string; bonusValue: number };
 type UserStats = { health: number; armor: number; strength: number; agility: number; intelligence: number; accuracy: number };
+type AssignableSkillStat = keyof UserStats;
 
 // Typ przedmiotu zgodny z tym co zwraca nowy endpoint /user/inventory
 type Item<T = WeaponStats | ArtifactStats> = {
@@ -40,6 +41,15 @@ interface PlayerInfo {
     skillPoints: number;
   }
 }
+
+const ASSIGNABLE_SKILLS: Array<{ key: AssignableSkillStat; label: string }> = [
+  { key: "health", label: "Zdrowie" },
+  { key: "armor", label: "Pancerz" },
+  { key: "strength", label: "Siła" },
+  { key: "agility", label: "Zręczność" },
+  { key: "intelligence", label: "Inteligencja" },
+  { key: "accuracy", label: "Celność" },
+];
 
 const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
   const [tab, setTab] = useState<'bronie' | 'artefakty'>('bronie');
@@ -84,7 +94,7 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
 
 
   // --- UMIEJĘTNOŚCI ---
-  const assignSkillPoint = async (stat: "accuracy") => {
+  const assignSkillPoint = async (stat: AssignableSkillStat) => {
     if (!userInfo || isAssigning) return;
     if (userInfo.profile.skillPoints <= 0) return;
 
@@ -221,19 +231,21 @@ const PlayerProfile: React.FC<PlayerProfileProps> = ({ userData }) => {
               <span>Punkty umiejętności</span>
               <strong>{userInfo.profile.skillPoints}</strong>
             </div>
-            <div className="skill-row">
-              <span>Celność</span>
-              <div className="skill-controls">
-                <span className="skill-value">{userStats.accuracy}</span>
-                <button
-                  className="skill-btn"
-                  disabled={isAssigning || userInfo.profile.skillPoints <= 0}
-                  onClick={() => assignSkillPoint("accuracy")}
-                >
-                  +
-                </button>
+            {ASSIGNABLE_SKILLS.map((skill) => (
+              <div className="skill-row" key={skill.key}>
+                <span>{skill.label}</span>
+                <div className="skill-controls">
+                  <span className="skill-value">{userStats[skill.key]}</span>
+                  <button
+                    className="skill-btn"
+                    disabled={isAssigning || userInfo.profile.skillPoints <= 0}
+                    onClick={() => assignSkillPoint(skill.key)}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            ))}
             {assignError && <div className="skill-error">{assignError}</div>}
           </div>
           

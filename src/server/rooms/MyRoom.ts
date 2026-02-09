@@ -80,6 +80,12 @@ export class MyRoom extends Room<MyRoomState> {
     private jetpackMaxEnergy = 100;
     private jetpackDrainPerSecond = 35;
     private jetpackRechargePerSecond = 20;
+    private strengthDamagePerPoint = 0.04;
+    private agilityReloadBonusPerPoint = 0.02;
+    private agilityReloadBonusCap = 0.4;
+    private intelligenceJetpackEnergyPerPoint = 6;
+    private intelligenceJetpackRechargePerPoint = 0.8;
+    private armorDamageReductionCap = 0.85;
     private grenadeSpawnIntervalMs = 9000;
     private maxGroundGrenadePickups = 6;
     private grenadePickupCollectRadius = 34;
@@ -190,9 +196,13 @@ export class MyRoom extends Room<MyRoomState> {
             auth.profile.stats.health,
             client.auth.username
         );
+        playerState.armor = auth.profile.stats.armor;
+        playerState.strength = auth.profile.stats.strength;
+        playerState.agility = auth.profile.stats.agility;
+        playerState.intelligence = auth.profile.stats.intelligence;
         playerState.accuracy = auth.profile.stats.accuracy;
-        playerState.maxJetpackEnergy = this.jetpackMaxEnergy;
-        playerState.jetpackEnergy = this.jetpackMaxEnergy;
+        playerState.maxJetpackEnergy = this.getMaxJetpackEnergyForPlayer(playerState);
+        playerState.jetpackEnergy = playerState.maxJetpackEnergy;
         playerState.grenades = 0;
 
         const userInventory = auth.profile.inventory || [];
@@ -284,6 +294,41 @@ export class MyRoom extends Room<MyRoomState> {
         return !tooCloseToPlayer;
     }
 
+    private getStrengthDamageMultiplier(player: Player): number {
+        return 1 + Math.max(0, player.strength) * this.strengthDamagePerPoint;
+    }
+
+    private getArmorDamageReduction(player: Player): number {
+        const armor = Math.max(0, player.armor);
+        if (armor <= 0) return 0;
+        // Inspired by TDP-like defense curve: 1->25%, 2->40%, 3->50%...
+        const reduction = armor / (armor + 3);
+        return Math.min(this.armorDamageReductionCap, reduction);
+    }
+
+    private applyIncomingDamage(target: Player, rawDamage: number): number {
+        const clampedRawDamage = Math.max(0, rawDamage);
+        const reduction = this.getArmorDamageReduction(target);
+        const reducedDamage = clampedRawDamage * (1 - reduction);
+        return Math.max(1, Math.round(reducedDamage));
+    }
+
+    private getReloadMultiplier(player: Player): number {
+        const bonus = Math.min(
+            this.agilityReloadBonusCap,
+            Math.max(0, player.agility) * this.agilityReloadBonusPerPoint
+        );
+        return 1 - bonus;
+    }
+
+    private getMaxJetpackEnergyForPlayer(player: Player): number {
+        return this.jetpackMaxEnergy + Math.max(0, player.intelligence) * this.intelligenceJetpackEnergyPerPoint;
+    }
+
+    private getJetpackRechargeForPlayer(player: Player): number {
+        return this.jetpackRechargePerSecond + Math.max(0, player.intelligence) * this.intelligenceJetpackRechargePerPoint;
+    }
+
     // --- LOGIKA GRY ---
 
     startReload(player: Player, weaponId: number) {
@@ -299,6 +344,8 @@ export class MyRoom extends Room<MyRoomState> {
         
         player.reloadingWeapons.set(weaponIdStr, true);
 
+        const adjustedReloadTime = Math.max(150, weaponStats.reloadTime * this.getReloadMultiplier(player));
+
         this.clock.setTimeout(() => {
             player.weaponMagazines.set(weaponId, weaponStats.amunition);
             // Usuń flagę przeładowania
@@ -307,7 +354,7 @@ export class MyRoom extends Room<MyRoomState> {
                 player.ammo = weaponStats.amunition;
             }
             console.log(`Weapon ${weaponId} reloaded!`);
-        }, weaponStats.reloadTime);
+        }, adjustedReloadTime);
     }
 
     initEngine() {
@@ -366,8 +413,9 @@ export class MyRoom extends Room<MyRoomState> {
         // --- POPRAWKA 1: Jeśli gracz już nie żyje, ignorujemy trafienie ---
         if (!hitPlayer.isAlive) return; 
 
-        hitPlayer.health -= bulletState.damage;
-        console.log(`💥 Player ${hitPlayer.name} hit for ${bulletState.damage}. HP = ${hitPlayer.health}`);
+        const finalDamage = this.applyIncomingDamage(hitPlayer, bulletState.damage);
+        hitPlayer.health -= finalDamage;
+        console.log(`💥 Player ${hitPlayer.name} hit for ${finalDamage}. HP = ${hitPlayer.health}`);
 
         if (hitPlayer.health <= 0) {
             // --- POPRAWKA 2: Zabezpieczenie przed wielokrotnym wywołaniem śmierci ---
@@ -504,6 +552,12 @@ export class MyRoom extends Room<MyRoomState> {
                 //     velocity.y = this.jumpVelocity;
                 // }
 
+                const maxJetpackEnergy = this.getMaxJetpackEnergyForPlayer(player);
+                if (player.maxJetpackEnergy !== maxJetpackEnergy) {
+                    player.maxJetpackEnergy = maxJetpackEnergy;
+                    player.jetpackEnergy = Math.min(player.jetpackEnergy, maxJetpackEnergy);
+                }
+                const jetpackRechargePerSecond = this.getJetpackRechargeForPlayer(player);
                 const wantsJetpack = player.input.jump;
                 const jetpackActive = wantsJetpack && player.jetpackEnergy > 0;
 
@@ -512,8 +566,8 @@ export class MyRoom extends Room<MyRoomState> {
                     velocity.y = this.jetpackThrust;
                 } else if (!wantsJetpack) {
                     player.jetpackEnergy = Math.min(
-                        player.maxJetpackEnergy,
-                        player.jetpackEnergy + this.jetpackRechargePerSecond * deltaSeconds
+                        maxJetpackEnergy,
+                        player.jetpackEnergy + jetpackRechargePerSecond * deltaSeconds
                     );
                 }
                 Matter.Body.setVelocity(body, velocity);
@@ -586,6 +640,8 @@ export class MyRoom extends Room<MyRoomState> {
         const centerX = grenadeBody.position.x;
         const centerY = grenadeBody.position.y;
         const ownerId = grenadeState.playerId;
+        const grenadeOwner = this.state.playerEntities.get(ownerId);
+        const ownerDamageMultiplier = grenadeOwner ? this.getStrengthDamageMultiplier(grenadeOwner) : 1;
 
         Matter.Composite.remove(this.world, grenadeBody);
         this.grenadeBodies.delete(grenadeId);
@@ -601,8 +657,12 @@ export class MyRoom extends Room<MyRoomState> {
             if (distance > this.grenadeExplosionRadius) continue;
 
             const falloff = 1 - distance / this.grenadeExplosionRadius;
-            const damage = Math.max(10, Math.round(this.grenadeExplosionMaxDamage * falloff));
-            player.health -= damage;
+            const rawDamage = Math.max(
+                10,
+                Math.round(this.grenadeExplosionMaxDamage * falloff * ownerDamageMultiplier)
+            );
+            const finalDamage = this.applyIncomingDamage(player, rawDamage);
+            player.health -= finalDamage;
 
             if (player.health <= 0) {
                 player.health = 0;
@@ -651,18 +711,24 @@ export class MyRoom extends Room<MyRoomState> {
                 player.ammo -= 1;
                 player.weaponMagazines.set(player.currentWeaponId, player.ammo);
                 const bulletId = nanoid();
+                const baseDamage =
+                    Weapons[player.currentWeaponId].min_damage +
+                    Math.floor(
+                        Math.random() * (
+                            Weapons[player.currentWeaponId].max_damage - Weapons[player.currentWeaponId].min_damage + 1
+                        )
+                    );
+                const boostedDamage = Math.max(
+                    1,
+                    Math.round(baseDamage * this.getStrengthDamageMultiplier(player))
+                );
                 const bulletState = new Bullet(
                     bulletId, 
                     player.id, 
                     data.x,
                     data.y,
                     data.angle,
-                    Weapons[player.currentWeaponId].min_damage + 
-                                        Math.floor(
-                                            Math.random() * (
-                                                Weapons[player.currentWeaponId].max_damage - Weapons[player.currentWeaponId].min_damage + 1
-                                            )
-                                        ),
+                    boostedDamage,
                     this.world
                 );
 

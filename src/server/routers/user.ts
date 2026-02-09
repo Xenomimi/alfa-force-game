@@ -74,9 +74,17 @@ router.get("/playerstats", verifyToken, async (req, res) => {
 router.post("/assign-skill", verifyToken, async (req, res) => {
     try {
         const userId = (req as any).userId as number;
-        const { stat } = req.body as { stat?: string };
+        const statIncrements = {
+            health: 50,
+            armor: 1,
+            strength: 1,
+            agility: 1,
+            intelligence: 1,
+            accuracy: 1
+        } as const;
+        const { stat } = req.body as { stat?: keyof typeof statIncrements };
+        const allowedStats = Object.keys(statIncrements);
 
-        const allowedStats = ["accuracy"];
         if (!stat || !allowedStats.includes(stat)) {
             return res.status(400).json({ error: "Nieprawidłowa umiejętność" });
         }
@@ -94,8 +102,10 @@ router.post("/assign-skill", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Brak punktów umiejętności" });
         }
 
-        const statUpdate: Record<string, any> = {};
-        if (stat === "accuracy") statUpdate.accuracy = { increment: 1 };
+        const incrementBy = statIncrements[stat];
+        const statUpdate: Record<string, any> = {
+            [stat]: { increment: incrementBy }
+        };
 
         const updatedProfile = await prisma.playerProfile.update({
             where: { id: user.profile.id },
